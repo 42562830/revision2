@@ -2738,52 +2738,45 @@
             let title = "";
 
             if (scope === 'current') {
+                // MODO: SERIE ACTUAL
                 if (!APP_STATE.currentSerie) {
-                    // FALLBACK INTELIGENTE: Si no hay serie seleccionada, avisar y cambiar a 'all' o mostrar error en pantalla
+                    // CORRECCIÓN: Si no hay serie seleccionada, mostramos aviso en vez de pantalla en blanco
                     container.innerHTML = `
-                        <div class="p-8 text-center">
-                            <div class="text-orange-500 font-bold mb-2">⚠️ No hay serie seleccionada</div>
-                            <p class="text-sm text-gray-600 mb-4">Para usar "Serie Actual", primero debes seleccionar una serie en el menú lateral.</p>
-                            <button onclick="document.querySelector('input[value=all]').click(); generateReport();" class="px-4 py-2 bg-blue-600 text-white rounded text-sm font-bold">
+                        <div class="flex flex-col items-center justify-center p-12 text-center bg-white rounded-lg border border-red-100 shadow-sm">
+                            <i data-lucide="alert-circle" class="w-12 h-12 text-red-500 mb-4"></i>
+                            <h3 class="text-lg font-bold text-gray-800 mb-2">No hay serie seleccionada</h3>
+                            <p class="text-sm text-gray-600 mb-6">Para usar "Serie Actual", primero debes entrar en una serie del menú.</p>
+                            <button onclick="document.querySelector('input[value=all]').click(); generateReport();" class="px-4 py-2 bg-blue-600 text-white rounded text-sm font-bold hover:bg-blue-700 transition">
                                 Cambiar a "Todo el Catálogo"
                             </button>
                         </div>
                     `;
                     container.classList.remove('hidden');
                     placeholder.classList.add('hidden');
+                    if (window.lucide) lucide.createIcons();
                     return;
                 }
-                reportData = APP_STATE.hierarchy[APP_STATE.currentSerie.coll][APP_STATE.currentSerie.name];
-                title = `INFORME: ${APP_STATE.currentSerie.name} (${APP_STATE.currentSerie.coll})`;
+                // Si existe la serie, copiamos los datos
+                if (APP_STATE.hierarchy[APP_STATE.currentSerie.coll] && APP_STATE.hierarchy[APP_STATE.currentSerie.coll][APP_STATE.currentSerie.name]) {
+                    reportData = [...APP_STATE.hierarchy[APP_STATE.currentSerie.coll][APP_STATE.currentSerie.name]];
+                    title = `INFORME: ${APP_STATE.currentSerie.name} (${APP_STATE.currentSerie.coll})`;
+                }
             } else {
-                // TODO EL CATÁLOGO
-                // Aplicar filtros globales si existen
-                // (Si el usuario ha filtrado por fecha o técnica en el sidebar principal, ¿deberíamos respetarlo?)
-                // El usuario dijo: "necesito que liste todos los artciulos selecionado con esos valores"
-                // Asumiremos que si hay filtros activos en APP_STATE (dateFilter, techFilter), los usamos.
-
-                // Recalculamos 'filtered data' basándonos en los filtros actuales
-                // Esto es un poco redundante con buildHierarchy pero asegura consistencia
-
-                // Si queremos TODO lo que hay en memoria (filtrado o no):
-                // Usaremos una estrategia: Si hay filtros activos, usamos los datos filtrados. Si no, todo.
-
-                // Para simplificar y ser robustos: Usamos todos los datos que están actualmente en el árbol (APP_STATE.hierarchy)
-                // O mejor, iteramos APP_STATE.data y aplicamos los filtros activos manualmente para estar seguros.
-
-                // Vamos a usar APP_STATE.data pero filtrado por lo que esté activo
+                // MODO: TODO EL CATÁLOGO (Aplicando filtros activos)
+                // Aquí aplicamos manualmente los filtros que estén activos en el menú lateral
                 reportData = APP_STATE.data.filter(row => {
                     // Filtro Fecha
                     if (APP_STATE.dateFilter.active) {
-                        if (APP_STATE.dateFilter.mode === 'custom') {
-                            const { year, month } = APP_STATE.dateFilter;
-                            if (!row._dateObj) return false;
+                        const { mode, year, month, monthsBack } = APP_STATE.dateFilter;
+                        if (!row._dateObj) return false;
+                        if (mode === 'custom') {
                             if (year && row._dateObj.getFullYear() !== year) return false;
                             if (month !== null && row._dateObj.getMonth() !== month) return false;
-                        } else if (APP_STATE.dateFilter.mode.startsWith('recent')) {
+                        } else if (mode && mode.startsWith('recent')) {
                             const cutoff = new Date();
-                            cutoff.setMonth(cutoff.getMonth() - APP_STATE.dateFilter.monthsBack);
-                            if (!row._dateObj || row._dateObj < cutoff) return false;
+                            cutoff.setMonth(cutoff.getMonth() - monthsBack);
+                            cutoff.setHours(0, 0, 0, 0);
+                            if (row._dateObj < cutoff) return false;
                         }
                     }
                     // Filtro Técnica
@@ -2802,24 +2795,20 @@
                     }
                     return true;
                 });
-
                 title = `INFORME GLOBAL (${reportData.length} Artículos)`;
             }
 
-            // 3. Ordenar Datos (Jerarquía: Colección > Serie > Formato > Nombre)
+            // 3. Ordenar Datos
             reportData.sort((a, b) => {
                 const collA = safeVal(a[COLS.COLECCION]);
                 const collB = safeVal(b[COLS.COLECCION]);
                 if (collA !== collB) return collA.localeCompare(collB);
-
                 const serieA = safeVal(a[COLS.SERIE]);
                 const serieB = safeVal(b[COLS.SERIE]);
                 if (serieA !== serieB) return serieA.localeCompare(serieB);
-
                 const fmtA = safeVal(a[COLS.MEDIDA]);
                 const fmtB = safeVal(b[COLS.MEDIDA]);
                 if (fmtA !== fmtB) return fmtA.localeCompare(fmtB);
-
                 return safeVal(a[COLS.NOMBRE]).localeCompare(safeVal(b[COLS.NOMBRE]));
             });
 
@@ -2833,7 +2822,7 @@
 
             if (!data || data.length === 0) {
                 container.innerHTML = `
-                    <div class="p-8 text-center text-gray-500 bg-white rounded border border-gray-200">
+                    <div class="p-8 text-center text-gray-500 bg-white rounded border border-gray-200 mt-4">
                         <i data-lucide="search-x" class="w-12 h-12 mx-auto mb-2 text-gray-300"></i>
                         <p>No se encontraron artículos con los filtros actuales.</p>
                     </div>`;
@@ -2843,7 +2832,7 @@
                 return;
             }
 
-            // Mapeo de nombres de columna para cabecera
+            // Etiquetas amigables para las columnas
             const colLabels = {
                 'ID': 'ID', 'NOMBRE': 'Nombre', 'COLOR': 'Color', 'GRAFICAS': 'Gráficas',
                 'MEDIDA': 'Medida', 'ESPESOR': 'Espesor', 'ACABADO_ART': 'Acabado', 'TIPOLOGIA': 'Tipología', 'VARIACION': 'Variación',
@@ -2853,13 +2842,15 @@
             };
 
             let html = `
-                <div class="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden mb-8">
-                    <div class="p-4 border-b border-gray-200 bg-gray-50 flex justify-between items-center sticky top-0 z-10">
-                        <span class="font-bold text-gray-800 text-sm uppercase tracking-wide">${title}</span>
-                        <span class="text-xs font-bold bg-blue-100 text-blue-800 px-2 py-1 rounded-full">${data.length} SKUs</span>
+                <div class="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden mb-8 flex flex-col h-full">
+                    <div class="p-4 border-b border-gray-200 bg-gray-50 flex justify-between items-center sticky top-0 z-10 flex-shrink-0">
+                        <span class="font-bold text-gray-800 text-sm uppercase tracking-wide flex items-center gap-2">
+                             <i data-lucide="file-text" class="w-4 h-4 text-gray-500"></i> ${title}
+                        </span>
+                        <span class="text-xs font-bold bg-blue-100 text-blue-800 px-2 py-1 rounded-full border border-blue-200">${data.length} SKUs</span>
                     </div>
-                    <div class="overflow-x-auto max-h-[calc(100vh-200px)]">
-                        <table class="report-table" id="export-table">
+                    <div class="overflow-auto flex-1 custom-scrollbar" style="max-height: calc(100vh - 220px);">
+                        <table class="report-table w-full" id="export-table">
                             <thead>
                                 <tr>
                                     ${columns.map(col => `<th>${colLabels[col] || col}</th>`).join('')}
@@ -2872,44 +2863,44 @@
             let lastFormat = null;
 
             data.forEach(row => {
-                // Agrupación visual
                 const currentSerie = safeVal(row[COLS.SERIE]);
                 const currentFormat = safeVal(row[COLS.MEDIDA]);
+                const currentColl = safeVal(row[COLS.COLECCION]);
 
-                // Si cambiamos de serie, insertamos cabecera de grupo
+                // Agrupación por Serie
                 if (currentSerie !== lastSerie) {
-                    html += `<tr><td colspan="${columns.length}" class="report-group-header text-lg border-t-2 border-gray-300 mt-4">
-                        <div class="flex items-center gap-2">
-                            <i data-lucide="folder" class="w-4 h-4 text-gray-500"></i> ${currentSerie} 
-                            <span class="text-xs font-normal text-gray-500 ml-2">(${safeVal(row[COLS.COLECCION])})</span>
-                        </div>
-                    </td></tr>`;
+                    html += `<tr class="bg-gray-100 border-t-2 border-gray-300">
+                        <td colspan="${columns.length}" class="report-group-header py-3 px-4 font-bold text-gray-800">
+                            <div class="flex items-center gap-2">
+                                <i data-lucide="folder-open" class="w-4 h-4 text-gray-500"></i> ${currentSerie} 
+                                <span class="text-xs font-normal text-gray-500 bg-white border px-2 py-0.5 rounded ml-2">${currentColl}</span>
+                            </div>
+                        </td>
+                    </tr>`;
                     lastSerie = currentSerie;
-                    lastFormat = null; // Reset formato
+                    lastFormat = null;
                 }
 
-                // Si cambiamos de formato dentro de la misma serie
+                // Agrupación por Formato (sub-cabecera opcional para legibilidad)
                 if (currentFormat !== lastFormat) {
-                    html += `<tr><td colspan="${columns.length}" class="report-group-header bg-gray-100 text-sm pl-8 text-gray-600">
-                        <i data-lucide="ruler" class="w-3 h-3 inline mr-1"></i> ${currentFormat}
-                    </td></tr>`;
+                    html += `<tr class="bg-gray-50">
+                        <td colspan="${columns.length}" class="py-2 px-4 text-xs font-bold text-gray-500 uppercase tracking-wider pl-8 border-b border-gray-100">
+                             <i data-lucide="ruler" class="w-3 h-3 inline mr-1"></i> ${currentFormat}
+                        </td>
+                    </tr>`;
                     lastFormat = currentFormat;
                 }
 
-                html += '<tr class="hover:bg-blue-50 transition-colors">';
+                html += '<tr class="hover:bg-blue-50 transition-colors border-b border-gray-100">';
                 columns.forEach(col => {
+                    // Usamos COLS[col] para obtener la clave exacta del CSV (ej: 'Desc._Familia_web')
                     let val = safeVal(row[COLS[col]]);
-                    html += `<td>${val}</td>`;
+                    html += `<td class="py-2 px-3 whitespace-nowrap">${val}</td>`;
                 });
                 html += '</tr>';
             });
 
-            html += `
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            `;
+            html += `</tbody></table></div></div>`;
 
             container.innerHTML = html;
             container.classList.remove('hidden');
