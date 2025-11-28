@@ -1218,7 +1218,7 @@
     <script>
         // --- 1. CONFIGURACIÓN Y ESTADO ---
         const CONFIG = {
-            csvFileName: './BD-21-11-2025.csv', // NOMBRE DEL FICHERO EN LA RAÍZ
+            csvFileName: './BD-21-11-2025.csv', 
             encoding: 'ISO-8859-1'
         };
 
@@ -1227,25 +1227,10 @@
             hierarchy: {},
             auditResults: JSON.parse(localStorage.getItem('audit_results_v1')) || {},
             currentSerie: null,
-            dateFilter: {
-                active: false,
-                year: null,
-                month: null,
-                mode: null // 'recent_1', 'recent_3', 'year', 'custom'
-            },
-            techFilter: {
-                active: false,
-                cte: null,
-                r: null,
-                din: null,
-                ptv: null
-            },
-            structFilter: { // MEJORA 5
-                active: false,
-                medida: null,
-                tipo: null
-            },
-            compactMode: false, // MEJORA 1
+            dateFilter: { active: false, year: null, month: null, mode: null },
+            techFilter: { active: false, cte: null, r: null, din: null, ptv: null },
+            structFilter: { active: false, medida: null, tipo: null },
+            compactMode: false,
             focusedRowIndex: -1
         };
 
@@ -1258,7 +1243,6 @@
             ACABADO_SERIE: 'Acabado_pieza_web',
             VARIACION: 'Variacion_cromatica',
             AREA: 'area',
-
             ID: 'Id._Articulo',
             IMAGEN: 'Imagen_web',
             NOMBRE: 'Nombre',
@@ -1269,14 +1253,11 @@
             GRUPO_PRECIO: 'Grupo_Tarifa',
             GRAFICAS: 'Graficas',
             PEI: 'UNE-EN_ISO_10545-7',
-
-            FECHA_ALTA: 'Fecha_de_alta', // NUEVA COLUMNA
-
+            FECHA_ALTA: 'Fecha_de_alta',
             CLASE: 'UNE_41901:2017_EX',
             R: 'Deslizamiento_DIN_51130',
             LETRA: 'DIN_51097',
             PTV: 'PTV_(WET)',
-
             PZ_CAJA: 'Pz/Caja',
             M2_CAJA: 'M2/Caja',
             KG_CAJA: 'Kg/Caja',
@@ -1285,7 +1266,7 @@
             KG_PALLET: 'Kg/Pallet'
         };
 
-        // --- 2. INICIO AUTOMÁTICO (AUTO-LOAD) ---
+        // --- 2. INICIO AUTOMÁTICO ---
         document.addEventListener('DOMContentLoaded', () => {
             autoLoadCSV();
         });
@@ -1296,9 +1277,7 @@
 
             fetch(CONFIG.csvFileName)
                 .then(response => {
-                    if (!response.ok) {
-                        throw new Error(`No se encontró el archivo ${CONFIG.csvFileName}`);
-                    }
+                    if (!response.ok) throw new Error(`No se encontró el archivo ${CONFIG.csvFileName}`);
                     return response.arrayBuffer();
                 })
                 .then(buffer => {
@@ -1308,9 +1287,12 @@
                 })
                 .catch(error => {
                     console.error("Error cargando CSV:", error);
-                    alert(`❌ ERROR CRÍTICO:\nNo se pudo cargar el archivo "${CONFIG.csvFileName}".\n\nAsegúrate de que el archivo está en la carpeta raíz del repositorio y que estás accediendo vía HTTP/HTTPS (no file://).`);
-                    // Si falla, mostramos el overlay para feedback visual
-                    document.getElementById('upload-overlay').style.display = 'flex';
+                    const overlay = document.getElementById('upload-overlay');
+                    if(overlay) {
+                        overlay.style.display = 'flex';
+                        overlay.querySelector('h1').innerText = "Error de Carga";
+                        overlay.querySelector('#loading-msg').innerHTML = `<p class="text-red-600 font-bold">${error.message}</p>`;
+                    }
                 });
         }
 
@@ -1322,27 +1304,20 @@
                 complete: function (results) {
                     const fields = results.meta.fields || [];
                     if (!fields.includes(COLS.ID) || !fields.includes(COLS.SERIE)) {
-                        alert("❌ ERROR DE FORMATO:\nEl CSV cargado no tiene las columnas requeridas ('Id._Articulo', 'Serie_web').");
+                        alert("❌ ERROR DE FORMATO:\nFaltan columnas requeridas.");
                         return;
                     }
 
-                    // Procesar fechas
                     APP_STATE.data = results.data.map(row => {
                         const dateStr = row[COLS.FECHA_ALTA];
                         let dateObj = null;
                         if (dateStr) {
                             const parts = dateStr.split('/');
                             if (parts.length === 3) {
-                                // Asumiendo DD/MM/YYYY
                                 let year = parseInt(parts[2]);
-                                const month = parseInt(parts[1]) - 1; // Los meses en JS van de 0 a 11
+                                const month = parseInt(parts[1]) - 1;
                                 const day = parseInt(parts[0]);
-
-                                // CORRECCIÓN: Si el año tiene 2 dígitos (ej: 25), asumimos 2000+
-                                if (year < 100) {
-                                    year += 2000;
-                                }
-
+                                if (year < 100) year += 2000;
                                 dateObj = new Date(year, month, day);
                             }
                         }
@@ -1353,16 +1328,53 @@
                     initInterface();
                     initDateSearch();
                     initTechSearch();
-                    initStructuralSearch(); // MEJORA 5
-                    initKeyboardNav();      // MEJORA 2
+                    initStructuralSearch();
+                    initKeyboardNav();
                 },
                 error: function (err) {
-                    alert("Error al procesar datos CSV: " + err.message);
+                    alert("Error al procesar CSV: " + err.message);
                 }
             });
         }
 
-        function initStructuralSearch() { // MEJORA 5
+        // --- FUNCIONES DE FILTRO ---
+        function getFilteredDataGlobal() {
+            // ESTA FUNCIÓN ES LA CLAVE PARA QUE EL INFORME COINCIDA CON EL MENÚ
+            return APP_STATE.data.filter(row => {
+                // 1. Filtro Fecha
+                if (APP_STATE.dateFilter.active) {
+                    const { mode, year, month, monthsBack } = APP_STATE.dateFilter;
+                    if (!row._dateObj) return false;
+                    
+                    if (mode === 'custom') {
+                        if (year && row._dateObj.getFullYear() !== year) return false;
+                        if (month !== null && row._dateObj.getMonth() !== month) return false;
+                    } else if (mode && mode.startsWith('recent')) {
+                        const cutoff = new Date();
+                        cutoff.setMonth(cutoff.getMonth() - monthsBack);
+                        cutoff.setHours(0,0,0,0);
+                        if (row._dateObj < cutoff) return false;
+                    }
+                }
+                // 2. Filtro Técnico
+                if (APP_STATE.techFilter.active) {
+                    const { cte, r, din, ptv } = APP_STATE.techFilter;
+                    if (cte && safeVal(row[COLS.CLASE]) !== cte) return false;
+                    if (r && safeVal(row[COLS.R]) !== r) return false;
+                    if (din && safeVal(row[COLS.LETRA]) !== din) return false;
+                    if (ptv && safeVal(row[COLS.PTV]) !== ptv) return false;
+                }
+                // 3. Filtro Estructural
+                if (APP_STATE.structFilter.active) {
+                    const { medida, tipo } = APP_STATE.structFilter;
+                    if (medida && safeVal(row[COLS.MEDIDA]) !== medida) return false;
+                    if (tipo && safeVal(row[COLS.TIPOLOGIA]) !== tipo) return false;
+                }
+                return true;
+            });
+        }
+
+        function initStructuralSearch() {
             if (document.getElementById('filter-medida')) return;
             const medidaSet = new Set();
             const tipoSet = new Set();
@@ -1419,7 +1431,6 @@
             const applyStructFilter = () => {
                 const medida = fMedida.value || null;
                 const tipo = fTipo.value || null;
-
                 if (medida || tipo) {
                     APP_STATE.structFilter = { active: true, medida, tipo };
                     updateUIState(true);
@@ -1432,7 +1443,6 @@
 
             fMedida.addEventListener('change', applyStructFilter);
             fTipo.addEventListener('change', applyStructFilter);
-
             btnReset.addEventListener('click', (e) => {
                 e.stopPropagation();
                 resetStructFilter();
@@ -1455,104 +1465,23 @@
                 updateUIState(false);
                 buildHierarchy();
                 renderSidebar();
-                if (APP_STATE.currentSerie) loadSerieView(APP_STATE.currentSerie.name, APP_STATE.currentSerie.coll);
-                else {
-                    document.getElementById('empty-state').style.display = 'flex';
-                    document.getElementById('serie-content').innerHTML = '';
-                }
+                resetMainView();
             }
 
             function executeStructFilter() {
-                const { medida, tipo } = APP_STATE.structFilter;
-                const filtered = APP_STATE.data.filter(row => {
-                    let match = true;
-                    if (medida && safeVal(row[COLS.MEDIDA]) !== medida) match = false;
-                    if (tipo && safeVal(row[COLS.TIPOLOGIA]) !== tipo) match = false;
-                    return match;
-                });
+                const filtered = getFilteredDataGlobal();
                 buildHierarchy(filtered);
                 renderSidebar();
-                document.getElementById('empty-state').style.display = 'flex';
-                document.getElementById('empty-state').querySelector('p').innerText = `Se encontraron ${filtered.length} artículos (Filtro Estructural).`;
-                document.getElementById('serie-content').innerHTML = '';
-                APP_STATE.currentSerie = null;
+                updateMainViewWithFilter(filtered, "Filtro Estructural");
             }
-        }
-
-        // --- 3. UTILIDADES ---
-        function safeVal(value) {
-            if (value === null || value === undefined) return "";
-            return String(value).trim();
-        }
-
-        function hasValue(value) {
-            return value !== null && value !== undefined && String(value).trim() !== "";
-        }
-
-        function renderField(value, label, isPrice = false) {
-            const val = safeVal(value);
-            if (!val) {
-                return `<span class="text-red-600 text-[10px] font-bold bg-red-50 px-2 py-1 rounded border border-red-100 flex items-center gap-1 w-fit">⚠️ ${label}</span>`;
-            }
-            if (isPrice) return `<span class="font-tech font-bold text-gray-900 text-base tracking-tight">${val}</span>`;
-            return `<span class="text-gray-700 font-medium">${val}</span>`;
-        }
-
-        function renderVariation(value) {
-            const val = safeVal(value).toUpperCase();
-            if (!val) return renderField(value, 'VAR');
-
-            let vCode = '';
-            if (val.includes('UNIFORME')) vCode = 'V1';
-            else if (val.includes('LEVE')) vCode = 'V2';
-            else if (val.includes('MODERADA')) vCode = 'V3';
-            else if (val.includes('ALTA')) vCode = 'V4';
-
-            if (vCode) {
-                return `
-                <div class="flex items-center gap-3">
-                    <span class="text-2xl font-bold text-gray-900 font-tech tracking-tighter">${vCode}</span>
-                    <span class="text-[10px] font-bold text-gray-500 uppercase leading-tight tracking-wide border-l border-gray-300 pl-3">${val}</span>
-                </div>`;
-            }
-            return renderField(value, 'VAR');
-        }
-
-        function buildHierarchy(filteredData = null) {
-            const sourceData = filteredData || APP_STATE.data;
-            const tree = {};
-            sourceData.forEach(row => {
-                if (!safeVal(row[COLS.ID]) && !safeVal(row[COLS.SERIE])) return;
-                let coll = safeVal(row[COLS.COLECCION]) || 'SIN COLECCIÓN';
-                let serie = safeVal(row[COLS.SERIE]) || 'SIN SERIE';
-                if (!tree[coll]) tree[coll] = {};
-                if (!tree[coll][serie]) tree[coll][serie] = [];
-                tree[coll][serie].push(row);
-            });
-            APP_STATE.hierarchy = tree;
-        }
-
-        // --- 4. INTERFAZ DE USUARIO ---
-        function initInterface() {
-            const overlay = document.getElementById('upload-overlay');
-            if (overlay) overlay.style.display = 'none';
-
-            document.getElementById('app-container').classList.remove('hidden');
-            renderSidebar();
-            updateGlobalProgress();
-            if (window.lucide) lucide.createIcons();
         }
 
         function initDateSearch() {
-            // Extraer años disponibles
             const years = new Set();
-            APP_STATE.data.forEach(r => {
-                if (r._dateObj) years.add(r._dateObj.getFullYear());
-            });
+            APP_STATE.data.forEach(r => { if (r._dateObj) years.add(r._dateObj.getFullYear()); });
             const sortedYears = Array.from(years).sort((a, b) => b - a);
 
             const sidebarHeader = document.querySelector('.sidebar-header');
-
             const container = document.createElement('div');
             container.className = 'filter-accordion border-t border-gray-200 mt-2';
             container.innerHTML = `
@@ -1565,36 +1494,26 @@
                 </div>
                 <div class="filter-body" id="body-date">
                     <div class="grid grid-cols-2 gap-2 mb-2">
-                        <select id="filter-year" class="w-full text-xs p-2 border rounded bg-white text-gray-700 focus:border-red-500 focus:ring-1 focus:ring-red-500 outline-none">
+                        <select id="filter-year" class="w-full text-xs p-2 border rounded bg-white text-gray-700 outline-none">
                             <option value="">Año...</option>
                             ${sortedYears.map(y => `<option value="${y}">${y}</option>`).join('')}
                         </select>
-                        <select id="filter-month" class="w-full text-xs p-2 border rounded bg-white text-gray-700 focus:border-red-500 focus:ring-1 focus:ring-red-500 outline-none">
+                        <select id="filter-month" class="w-full text-xs p-2 border rounded bg-white text-gray-700 outline-none">
                             <option value="">Mes...</option>
-                            <option value="0">Enero</option>
-                            <option value="1">Febrero</option>
-                            <option value="2">Marzo</option>
-                            <option value="3">Abril</option>
-                            <option value="4">Mayo</option>
-                            <option value="5">Junio</option>
-                            <option value="6">Julio</option>
-                            <option value="7">Agosto</option>
-                            <option value="8">Septiembre</option>
-                            <option value="9">Octubre</option>
-                            <option value="10">Noviembre</option>
-                            <option value="11">Diciembre</option>
+                            <option value="0">Enero</option><option value="1">Febrero</option><option value="2">Marzo</option>
+                            <option value="3">Abril</option><option value="4">Mayo</option><option value="5">Junio</option>
+                            <option value="6">Julio</option><option value="7">Agosto</option><option value="8">Septiembre</option>
+                            <option value="9">Octubre</option><option value="10">Noviembre</option><option value="11">Diciembre</option>
                         </select>
                     </div>
                     <div class="flex gap-2">
-                        <button id="btn-recent-1" class="flex-1 py-1 px-2 bg-gray-100 hover:bg-gray-200 text-gray-600 text-[10px] font-bold rounded transition border border-gray-200">1 Mes</button>
-                        <button id="btn-recent-3" class="flex-1 py-1 px-2 bg-gray-100 hover:bg-gray-200 text-gray-600 text-[10px] font-bold rounded transition border border-gray-200">3 Meses</button>
+                        <button id="btn-recent-1" class="flex-1 py-1 px-2 bg-gray-100 text-gray-600 text-[10px] font-bold rounded">1 Mes</button>
+                        <button id="btn-recent-3" class="flex-1 py-1 px-2 bg-gray-100 text-gray-600 text-[10px] font-bold rounded">3 Meses</button>
                     </div>
                 </div>
             `;
-
             sidebarHeader.appendChild(container);
 
-            // UI Elements
             const header = container.querySelector('.filter-header');
             const body = container.querySelector('.filter-body');
             const chevron = container.querySelector('.filter-chevron');
@@ -1604,7 +1523,6 @@
             const btnRecent1 = document.getElementById('btn-recent-1');
             const btnRecent3 = document.getElementById('btn-recent-3');
 
-            // Accordion Logic
             header.addEventListener('click', (e) => {
                 if (e.target.closest('#btn-reset-date')) return;
                 const isHidden = body.style.display === 'none' || body.style.display === '';
@@ -1615,7 +1533,6 @@
             const applyFilter = () => {
                 const year = yearSelect.value ? parseInt(yearSelect.value) : null;
                 const month = monthSelect.value ? parseInt(monthSelect.value) : null;
-
                 if (year || month !== null) {
                     APP_STATE.dateFilter = { active: true, year, month, mode: 'custom' };
                     updateUIState(true);
@@ -1630,15 +1547,8 @@
             yearSelect.addEventListener('change', applyFilter);
             monthSelect.addEventListener('change', applyFilter);
 
-            btnRecent1.addEventListener('click', () => {
-                setRecentFilter(1);
-                updateActiveButtons(btnRecent1);
-            });
-
-            btnRecent3.addEventListener('click', () => {
-                setRecentFilter(3);
-                updateActiveButtons(btnRecent3);
-            });
+            btnRecent1.addEventListener('click', () => { setRecentFilter(1); updateActiveButtons(btnRecent1); });
+            btnRecent3.addEventListener('click', () => { setRecentFilter(3); updateActiveButtons(btnRecent3); });
 
             btnReset.addEventListener('click', (e) => {
                 e.stopPropagation();
@@ -1657,19 +1567,12 @@
                     btnReset.style.display = 'none';
                 }
             }
-
             function updateActiveButtons(activeBtn) {
                 [btnRecent1, btnRecent3].forEach(b => {
-                    if (b === activeBtn) {
-                        b.classList.add('bg-red-100', 'text-red-700', 'border-red-200');
-                        b.classList.remove('bg-gray-100', 'text-gray-600', 'border-gray-200');
-                    } else {
-                        b.classList.remove('bg-red-100', 'text-red-700', 'border-red-200');
-                        b.classList.add('bg-gray-100', 'text-gray-600', 'border-gray-200');
-                    }
+                    if (b === activeBtn) b.classList.add('bg-red-100', 'text-red-700');
+                    else b.classList.remove('bg-red-100', 'text-red-700');
                 });
             }
-
             function setRecentFilter(months) {
                 APP_STATE.dateFilter = { active: true, year: null, month: null, mode: `recent_${months}`, monthsBack: months };
                 updateUIState(true);
@@ -1677,64 +1580,23 @@
                 monthSelect.value = "";
                 executeDateFilter();
             }
-
             function resetFilter() {
                 APP_STATE.dateFilter = { active: false, year: null, month: null, mode: null };
                 updateUIState(false);
                 buildHierarchy();
                 renderSidebar();
-                if (APP_STATE.currentSerie) {
-                    loadSerieView(APP_STATE.currentSerie.name, APP_STATE.currentSerie.coll);
-                } else {
-                    document.getElementById('empty-state').style.display = 'flex';
-                    document.getElementById('serie-content').innerHTML = '';
-                }
+                resetMainView();
             }
-
             function executeDateFilter() {
-                let filtered = [];
-                const now = new Date();
-
-                if (APP_STATE.dateFilter.mode === 'custom') {
-                    const { year, month } = APP_STATE.dateFilter;
-                    filtered = APP_STATE.data.filter(r => {
-                        if (!r._dateObj) return false;
-                        const yMatch = year ? r._dateObj.getFullYear() === year : true;
-                        const mMatch = month !== null ? r._dateObj.getMonth() === month : true;
-                        return yMatch && mMatch;
-                    });
-                } else if (APP_STATE.dateFilter.mode.startsWith('recent')) {
-                    const monthsBack = APP_STATE.dateFilter.monthsBack;
-                    const cutoff = new Date();
-                    cutoff.setMonth(cutoff.getMonth() - monthsBack);
-
-                    filtered = APP_STATE.data.filter(r => {
-                        if (!r._dateObj) return false;
-                        return r._dateObj >= cutoff;
-                    });
-                }
-
+                const filtered = getFilteredDataGlobal();
                 buildHierarchy(filtered);
                 renderSidebar();
-
-                if (filtered.length === 0) {
-                    alert("No se encontraron artículos con los criterios de fecha seleccionados.");
-                }
-
-                document.getElementById('empty-state').style.display = 'flex';
-                document.getElementById('empty-state').querySelector('p').innerText = `Se encontraron ${filtered.length} artículos. Selecciona una serie para ver los detalles.`;
-                document.getElementById('serie-content').innerHTML = '';
-                APP_STATE.currentSerie = null;
+                updateMainViewWithFilter(filtered, "Filtro de Fecha");
             }
         }
 
         function initTechSearch() {
-            // 1. Extraer valores únicos para los filtros
-            const cteSet = new Set();
-            const rSet = new Set();
-            const dinSet = new Set();
-            const ptvSet = new Set();
-
+            const cteSet = new Set(), rSet = new Set(), dinSet = new Set(), ptvSet = new Set();
             APP_STATE.data.forEach(r => {
                 if (hasValue(r[COLS.CLASE])) cteSet.add(safeVal(r[COLS.CLASE]));
                 if (hasValue(r[COLS.R])) rSet.add(safeVal(r[COLS.R]));
@@ -1743,13 +1605,11 @@
             });
 
             const sortAlphaNum = (a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' });
-
             const cteOpts = Array.from(cteSet).sort(sortAlphaNum);
             const rOpts = Array.from(rSet).sort(sortAlphaNum);
             const dinOpts = Array.from(dinSet).sort(sortAlphaNum);
             const ptvOpts = Array.from(ptvSet).sort(sortAlphaNum);
 
-            // 2. Crear UI en Sidebar
             const sidebarHeader = document.querySelector('.sidebar-header');
             const container = document.createElement('div');
             container.className = 'filter-accordion';
@@ -1763,38 +1623,22 @@
                 </div>
                 <div class="filter-body" id="body-tech">
                     <div class="grid grid-cols-2 gap-2 mb-2">
-                        <select id="filter-cte" class="w-full text-xs p-2 border rounded bg-white text-gray-700 focus:border-red-500 focus:ring-1 focus:ring-red-500 outline-none">
-                            <option value="">CTE...</option>
-                            ${cteOpts.map(v => `<option value="${v}">${v}</option>`).join('')}
-                        </select>
-                        <select id="filter-r" class="w-full text-xs p-2 border rounded bg-white text-gray-700 focus:border-red-500 focus:ring-1 focus:ring-red-500 outline-none">
-                            <option value="">R...</option>
-                            ${rOpts.map(v => `<option value="${v}">${v}</option>`).join('')}
-                        </select>
+                        <select id="filter-cte" class="w-full text-xs p-2 border rounded bg-white outline-none"><option value="">CTE...</option>${cteOpts.map(v => `<option value="${v}">${v}</option>`).join('')}</select>
+                        <select id="filter-r" class="w-full text-xs p-2 border rounded bg-white outline-none"><option value="">R...</option>${rOpts.map(v => `<option value="${v}">${v}</option>`).join('')}</select>
                     </div>
                     <div class="grid grid-cols-2 gap-2">
-                        <select id="filter-din" class="w-full text-xs p-2 border rounded bg-white text-gray-700 focus:border-red-500 focus:ring-1 focus:ring-red-500 outline-none">
-                            <option value="">DIN...</option>
-                            ${dinOpts.map(v => `<option value="${v}">${v}</option>`).join('')}
-                        </select>
-                        <select id="filter-ptv" class="w-full text-xs p-2 border rounded bg-white text-gray-700 focus:border-red-500 focus:ring-1 focus:ring-red-500 outline-none">
-                            <option value="">PTV...</option>
-                            ${ptvOpts.map(v => `<option value="${v}">${v}</option>`).join('')}
-                        </select>
+                        <select id="filter-din" class="w-full text-xs p-2 border rounded bg-white outline-none"><option value="">DIN...</option>${dinOpts.map(v => `<option value="${v}">${v}</option>`).join('')}</select>
+                        <select id="filter-ptv" class="w-full text-xs p-2 border rounded bg-white outline-none"><option value="">PTV...</option>${ptvOpts.map(v => `<option value="${v}">${v}</option>`).join('')}</select>
                     </div>
                 </div>
             `;
-
             sidebarHeader.appendChild(container);
 
-            // 3. Event Listeners
             const header = container.querySelector('.filter-header');
             const body = container.querySelector('.filter-body');
             const chevron = container.querySelector('.filter-chevron');
-            const fCte = document.getElementById('filter-cte');
-            const fR = document.getElementById('filter-r');
-            const fDin = document.getElementById('filter-din');
-            const fPtv = document.getElementById('filter-ptv');
+            const fCte = document.getElementById('filter-cte'), fR = document.getElementById('filter-r');
+            const fDin = document.getElementById('filter-din'), fPtv = document.getElementById('filter-ptv');
             const btnReset = document.getElementById('btn-reset-tech');
 
             header.addEventListener('click', (e) => {
@@ -1805,102 +1649,110 @@
             });
 
             const applyTechFilter = () => {
-                const cte = fCte.value || null;
-                const r = fR.value || null;
-                const din = fDin.value || null;
-                const ptv = fPtv.value || null;
-
+                const cte = fCte.value || null, r = fR.value || null, din = fDin.value || null, ptv = fPtv.value || null;
                 if (cte || r || din || ptv) {
                     APP_STATE.techFilter = { active: true, cte, r, din, ptv };
                     updateUIState(true);
                 } else {
-                    resetTechFilter();
-                    return;
+                    resetTechFilter(); return;
                 }
                 executeTechFilter();
             };
 
             [fCte, fR, fDin, fPtv].forEach(el => el.addEventListener('change', applyTechFilter));
-
             btnReset.addEventListener('click', (e) => {
                 e.stopPropagation();
                 resetTechFilter();
-                fCte.value = "";
-                fR.value = "";
-                fDin.value = "";
-                fPtv.value = "";
+                fCte.value = ""; fR.value = ""; fDin.value = ""; fPtv.value = "";
             });
 
             function updateUIState(isActive) {
-                if (isActive) {
-                    header.classList.add('active-filter');
-                    btnReset.style.display = 'inline-block';
-                } else {
-                    header.classList.remove('active-filter');
-                    btnReset.style.display = 'none';
-                }
+                if (isActive) { header.classList.add('active-filter'); btnReset.style.display = 'inline-block'; }
+                else { header.classList.remove('active-filter'); btnReset.style.display = 'none'; }
             }
-
             function resetTechFilter() {
                 APP_STATE.techFilter = { active: false, cte: null, r: null, din: null, ptv: null };
                 updateUIState(false);
                 buildHierarchy();
                 renderSidebar();
-
-                if (APP_STATE.currentSerie) {
-                    loadSerieView(APP_STATE.currentSerie.name, APP_STATE.currentSerie.coll);
-                } else {
-                    document.getElementById('empty-state').style.display = 'flex';
-                    document.getElementById('serie-content').innerHTML = '';
-                }
+                resetMainView();
             }
-
             function executeTechFilter() {
-                const { cte, r, din, ptv } = APP_STATE.techFilter;
-
-                // Filtrar datos
-                const filtered = APP_STATE.data.filter(row => {
-                    let match = true;
-                    if (cte && safeVal(row[COLS.CLASE]) !== cte) match = false;
-                    if (r && safeVal(row[COLS.R]) !== r) match = false;
-                    if (din && safeVal(row[COLS.LETRA]) !== din) match = false;
-                    if (ptv && safeVal(row[COLS.PTV]) !== ptv) match = false;
-                    return match;
-                });
-
+                const filtered = getFilteredDataGlobal();
                 buildHierarchy(filtered);
                 renderSidebar();
-
-                if (filtered.length === 0) {
-                    alert("No se encontraron artículos con los criterios técnicos seleccionados.");
-                }
-
-                document.getElementById('empty-state').style.display = 'flex';
-                document.getElementById('empty-state').querySelector('p').innerText = `Se encontraron ${filtered.length} artículos (Filtro Técnico).`;
-                document.getElementById('serie-content').innerHTML = '';
-                APP_STATE.currentSerie = null;
+                updateMainViewWithFilter(filtered, "Filtro Técnico");
             }
         }
 
-        // ============================================================
-        // FUNCIONALIDAD ACORDEÓN
-        // ============================================================
+        // --- UTILIDADES ---
+        function safeVal(value) { return (value === null || value === undefined) ? "" : String(value).trim(); }
+        function hasValue(value) { return value !== null && value !== undefined && String(value).trim() !== ""; }
+        function renderField(value, label, isPrice = false) {
+            const val = safeVal(value);
+            if (!val) return `<span class="text-red-600 text-[10px] font-bold bg-red-50 px-2 py-1 rounded border border-red-100 flex items-center gap-1 w-fit">⚠️ ${label}</span>`;
+            if (isPrice) return `<span class="font-tech font-bold text-gray-900 text-base tracking-tight">${val}</span>`;
+            return `<span class="text-gray-700 font-medium">${val}</span>`;
+        }
+        function renderVariation(value) {
+            const val = safeVal(value).toUpperCase();
+            if (!val) return renderField(value, 'VAR');
+            let vCode = '';
+            if (val.includes('UNIFORME')) vCode = 'V1';
+            else if (val.includes('LEVE')) vCode = 'V2';
+            else if (val.includes('MODERADA')) vCode = 'V3';
+            else if (val.includes('ALTA')) vCode = 'V4';
+            if (vCode) return `<div class="flex items-center gap-3"><span class="text-2xl font-bold text-gray-900 font-tech tracking-tighter">${vCode}</span><span class="text-[10px] font-bold text-gray-500 uppercase leading-tight tracking-wide border-l border-gray-300 pl-3">${val}</span></div>`;
+            return renderField(value, 'VAR');
+        }
+        function buildHierarchy(filteredData = null) {
+            const sourceData = filteredData || APP_STATE.data;
+            const tree = {};
+            sourceData.forEach(row => {
+                if (!safeVal(row[COLS.ID]) && !safeVal(row[COLS.SERIE])) return;
+                let coll = safeVal(row[COLS.COLECCION]) || 'SIN COLECCIÓN';
+                let serie = safeVal(row[COLS.SERIE]) || 'SIN SERIE';
+                if (!tree[coll]) tree[coll] = {};
+                if (!tree[coll][serie]) tree[coll][serie] = [];
+                tree[coll][serie].push(row);
+            });
+            APP_STATE.hierarchy = tree;
+        }
+
+        function resetMainView() {
+            if (APP_STATE.currentSerie) loadSerieView(APP_STATE.currentSerie.name, APP_STATE.currentSerie.coll);
+            else {
+                document.getElementById('empty-state').style.display = 'flex';
+                document.getElementById('serie-content').innerHTML = '';
+            }
+        }
+        function updateMainViewWithFilter(filtered, filterName) {
+            if (filtered.length === 0) alert(`No se encontraron artículos con ${filterName}.`);
+            document.getElementById('empty-state').style.display = 'flex';
+            document.getElementById('empty-state').querySelector('p').innerText = `Se encontraron ${filtered.length} artículos (${filterName}).`;
+            document.getElementById('serie-content').innerHTML = '';
+            APP_STATE.currentSerie = null;
+        }
+
+        // --- UI ---
+        function initInterface() {
+            document.getElementById('upload-overlay').style.display = 'none';
+            document.getElementById('app-container').classList.remove('hidden');
+            renderSidebar();
+            updateGlobalProgress();
+            if (window.lucide) lucide.createIcons();
+        }
+
         function renderSidebar() {
             const nav = document.getElementById('nav-tree');
             nav.innerHTML = '';
-
             const keys = Object.keys(APP_STATE.hierarchy).sort();
-
-            if (keys.length === 0) {
-                nav.innerHTML = `<div class="p-4 text-sm text-gray-400 text-center italic">No hay resultados</div>`;
-                return;
-            }
+            if (keys.length === 0) { nav.innerHTML = `<div class="p-4 text-sm text-gray-400 text-center italic">No hay resultados</div>`; return; }
 
             keys.forEach((coll, index) => {
                 const cleanCollName = coll.toLowerCase();
                 const seriesList = Object.keys(APP_STATE.hierarchy[coll]).sort();
-                const seriesCount = seriesList.length;
-
+                
                 const collectionGroup = document.createElement('div');
                 collectionGroup.className = 'collection-group';
                 collectionGroup.dataset.coll = cleanCollName;
@@ -1908,22 +1760,15 @@
                 const header = document.createElement('div');
                 header.className = 'collection-header';
                 header.innerHTML = `
-                <div class="collection-title">
-                    <i data-lucide="folder" style="width:14px; height:14px; color:#cbd5e1;"></i>
-                    ${coll}
-                </div>
-                <div class="collection-meta">
-                    <span class="series-count-badge">${seriesCount}</span>
-                    <i data-lucide="chevron-right" class="chevron-icon"></i>
-                </div>
-            `;
+                    <div class="collection-title"><i data-lucide="folder" style="width:14px; height:14px; color:#cbd5e1;"></i>${coll}</div>
+                    <div class="collection-meta"><span class="series-count-badge">${seriesList.length}</span><i data-lucide="chevron-right" class="chevron-icon"></i></div>
+                `;
 
                 const seriesContainer = document.createElement('div');
                 seriesContainer.className = 'series-container';
                 seriesContainer.id = `series-container-${index}`;
 
-                // Auto-expandir si hay filtro de fecha activo
-                if (APP_STATE.dateFilter.active) {
+                if (APP_STATE.dateFilter.active || APP_STATE.techFilter.active || APP_STATE.structFilter.active) {
                     seriesContainer.style.display = 'block';
                     header.querySelector('.chevron-icon').classList.add('rotated');
                     seriesContainer.classList.add('expanded');
@@ -1931,15 +1776,9 @@
 
                 header.addEventListener('click', () => {
                     const isClosed = seriesContainer.style.display === 'none' || seriesContainer.style.display === '';
-                    if (isClosed) {
-                        seriesContainer.style.display = 'block';
-                        header.querySelector('.chevron-icon').classList.add('rotated');
-                        seriesContainer.classList.add('expanded');
-                    } else {
-                        seriesContainer.style.display = 'none';
-                        header.querySelector('.chevron-icon').classList.remove('rotated');
-                        seriesContainer.classList.remove('expanded');
-                    }
+                    seriesContainer.style.display = isClosed ? 'block' : 'none';
+                    if(isClosed) { header.querySelector('.chevron-icon').classList.add('rotated'); seriesContainer.classList.add('expanded'); }
+                    else { header.querySelector('.chevron-icon').classList.remove('rotated'); seriesContainer.classList.remove('expanded'); }
                 });
 
                 seriesList.forEach(serie => {
@@ -1955,12 +1794,10 @@
                     };
                     seriesContainer.appendChild(div);
                 });
-
                 collectionGroup.appendChild(header);
                 collectionGroup.appendChild(seriesContainer);
                 nav.appendChild(collectionGroup);
             });
-
             if (window.lucide) lucide.createIcons();
         }
 
@@ -1969,137 +1806,95 @@
             let err = 0, ok = 0;
             rows.forEach(r => {
                 const status = APP_STATE.auditResults[r[COLS.ID]]?.status;
-                if (status === 'error') err++;
-                if (status === 'ok') ok++;
+                if (status === 'error') err++; else if (status === 'ok') ok++;
             });
             if (err > 0) return `<div class="w-2 h-2 rounded-full bg-red-500 shadow-sm"></div>`;
             if (ok === rows.length && rows.length > 0) return `<div class="w-2 h-2 rounded-full bg-green-500 shadow-sm"></div>`;
             return '';
         }
 
-        // --- 5. RENDERIZADO DE SERIE ---
         function loadSerieView(serieName, collName) {
             document.getElementById('empty-state').style.display = 'none';
             APP_STATE.currentSerie = { name: serieName, coll: collName };
             const rows = APP_STATE.hierarchy[collName][serieName];
             const container = document.getElementById('serie-content');
-
             const first = rows[0];
-            const finishesSet = new Set();
-            const usosSet = new Set();
-            const tiposSet = new Set();
+
+            // Analisis
+            const finishesSet = new Set(), usosSet = new Set(), tiposSet = new Set();
             let has20MM = false;
-
             rows.forEach(r => {
-                const baseFinish = safeVal(r[COLS.ACABADO_SERIE]);
-                if (baseFinish) finishesSet.add(baseFinish);
-                const name = safeVal(r[COLS.NOMBRE]).toUpperCase();
-                if (name.includes("EXT")) finishesSet.add("EXT");
-                if (name.includes("DUP")) finishesSet.add("DUP");
-                if (safeVal(r[COLS.ESPESOR]).startsWith("20")) has20MM = true;
-
-                const usoItem = safeVal(r[COLS.USO]);
-                if (usoItem) usosSet.add(usoItem);
-                const tipoItem = safeVal(r[COLS.TIPOLOGIA]);
-                if (tipoItem) tiposSet.add(tipoItem);
+                if(safeVal(r[COLS.ACABADO_SERIE])) finishesSet.add(safeVal(r[COLS.ACABADO_SERIE]));
+                if(safeVal(r[COLS.NOMBRE]).toUpperCase().includes("EXT")) finishesSet.add("EXT");
+                if(safeVal(r[COLS.NOMBRE]).toUpperCase().includes("DUP")) finishesSet.add("DUP");
+                if(safeVal(r[COLS.ESPESOR]).startsWith("20")) has20MM = true;
+                if(safeVal(r[COLS.USO])) usosSet.add(safeVal(r[COLS.USO]));
+                if(safeVal(r[COLS.TIPOLOGIA])) tiposSet.add(safeVal(r[COLS.TIPOLOGIA]));
             });
-            const finishesStr = Array.from(finishesSet).join(', ');
-            const usosStr = Array.from(usosSet).join(', ');
-            const tiposStr = Array.from(tiposSet).join(', ');
 
-            const uniqueMeasures = new Map();
+            // Packing Map & Tech
+            const packingMap = new Map();
+            const techByFinish = {};
             rows.forEach(r => {
-                const label = safeVal(r[COLS.MEDIDA]);
-                if (!label) return;
-                if (!uniqueMeasures.has(label)) {
-                    const areaVal = parseFloat(safeVal(r[COLS.AREA]).replace(',', '.') || 0);
-                    uniqueMeasures.set(label, areaVal);
-                }
+                const pKey = `${safeVal(r[COLS.MEDIDA])}_${safeVal(r[COLS.ESPESOR])}`;
+                if (!packingMap.has(pKey) && (hasValue(r[COLS.PZ_CAJA]) || hasValue(r[COLS.M2_PALLET]))) packingMap.set(pKey, r);
+                
+                let fin = safeVal(r[COLS.ACABADO_ART]) || 'GENÉRICO';
+                if (safeVal(r[COLS.ESPESOR]).includes('20')) fin += ' [20MM]';
+                
+                if (!techByFinish[fin]) techByFinish[fin] = { cte: new Set(), r: new Set(), din: new Set(), ptv: new Set() };
+                if (hasValue(r[COLS.CLASE])) techByFinish[fin].cte.add(r[COLS.CLASE]);
+                if (hasValue(r[COLS.R])) techByFinish[fin].r.add(r[COLS.R]);
+                if (hasValue(r[COLS.LETRA])) techByFinish[fin].din.add(r[COLS.LETRA]);
+                if (hasValue(r[COLS.PTV])) techByFinish[fin].ptv.add(r[COLS.PTV]);
             });
-            const measuresStr = Array.from(uniqueMeasures.entries())
-                .sort((a, b) => b[1] - a[1])
-                .map(entry => entry[0])
-                .join(', ');
+
+            const packingList = Array.from(packingMap.values()).sort((a,b) => parseFloat(safeVal(b[COLS.AREA])) - parseFloat(safeVal(a[COLS.AREA])));
+            const measuresStr = packingList.map(p => p[COLS.MEDIDA]).join(', ');
 
             let html = `
-        <div class="panel p-8 mb-8 relative overflow-hidden animate-enter">
-            <div class="absolute top-0 right-0 w-64 h-64 bg-gradient-to-bl from-gray-100 to-transparent -mr-16 -mt-16 rounded-full z-0 pointer-events-none opacity-50"></div>
-            <div class="relative z-10">
-                <div class="flex justify-between items-start mb-8 border-b border-gray-100 pb-6">
-                    <div>
-                        <div class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 font-main">${collName}</div>
-                        <h2 class="text-4xl font-bold text-gray-900 flex items-center gap-4 tracking-tight">
-                            ${serieName}
-                            ${has20MM ? '<span class="badge-20mm"><i data-lucide="layers" class="w-3 h-3"></i> 20MM</span>' : ''}
-                        </h2>
-                    </div>
-                    <div class="flex gap-2">
-                        <button onclick="toggleCompactMode()" id="btn-compact" class="btn-accion secundario text-gray-700 border-gray-200 hover:bg-gray-50" title="Alternar Vista Compacta">
-                            <i data-lucide="minimize-2" class="w-4 h-4"></i> <span class="hidden md:inline">Compacto</span>
-                        </button>
-                        <button onclick="toggleCompactMode()" id="btn-compact" class="btn-accion secundario text-gray-700 border-gray-200 hover:bg-gray-50" title="Alternar Vista Compacta">
-                            <i data-lucide="minimize-2" class="w-4 h-4"></i> <span class="hidden md:inline">Compacto</span>
-                        </button>
-                        <button onclick="markAllOk()" class="btn-accion secundario text-green-700 border-green-200 hover:bg-green-50">
-                            <i data-lucide="check-check" class="w-4 h-4"></i> Validar Todo
-                        </button>
-                    </div>
-                </div>
-                
-                <div class="info-grid delay-100 animate-enter">
-                    <div class="info-card">
-                        <div class="info-label">Tipología</div>
-                        <div class="info-val text-sm">${tiposStr || '<span class="text-gray-300">-</span>'}</div>
-                    </div>
-                    <div class="info-card">
-                        <div class="info-label">Efecto</div>
-                        <div class="info-val">${renderField(first[COLS.EFECTO], 'EFECTO')}</div>
-                    </div>
-                    <div class="info-card">
-                        <div class="info-label">Acabados</div>
-                        <div class="info-val">${finishesStr || '<span class="text-gray-300">-</span>'}</div>
-                    </div>
-                    <div class="info-card">
-                        <div class="info-label">Uso</div>
-                        <div class="info-val text-sm">${usosStr || '<span class="text-gray-300">-</span>'}</div>
-                    </div>
-                    <div class="info-card">
-                        <div class="info-label">Variación</div>
-                        <div class="info-val">${renderVariation(first[COLS.VARIACION])}</div>
-                    </div>
-                    <div class="info-card col-span-2 md:col-span-1">
-                        <div class="info-label">Medidas</div>
-                        <div class="info-val text-xs leading-tight font-tech text-gray-600">${measuresStr || '-'}</div>
+                <div class="panel p-8 mb-8 relative overflow-hidden animate-enter">
+                    <div class="absolute top-0 right-0 w-64 h-64 bg-gradient-to-bl from-gray-100 to-transparent -mr-16 -mt-16 rounded-full opacity-50 pointer-events-none"></div>
+                    <div class="relative z-10">
+                        <div class="flex justify-between items-start mb-8 border-b border-gray-100 pb-6">
+                            <div>
+                                <div class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 font-main">${collName}</div>
+                                <h2 class="text-4xl font-bold text-gray-900 flex items-center gap-4 tracking-tight">${serieName} ${has20MM ? '<span class="badge-20mm">20MM</span>' : ''}</h2>
+                            </div>
+                            <div class="flex gap-2">
+                                <button onclick="toggleCompactMode()" id="btn-compact" class="btn-accion secundario text-gray-700 border-gray-200 hover:bg-gray-50"><i data-lucide="minimize-2" class="w-4 h-4"></i></button>
+                                <button onclick="markAllOk()" class="btn-accion secundario text-green-700 border-green-200 hover:bg-green-50"><i data-lucide="check-check" class="w-4 h-4"></i> Validar Todo</button>
+                            </div>
+                        </div>
+                        <div class="info-grid delay-100 animate-enter">
+                            <div class="info-card"><div class="info-label">Tipología</div><div class="info-val text-sm">${Array.from(tiposSet).join(', ') || '-'}</div></div>
+                            <div class="info-card"><div class="info-label">Efecto</div><div class="info-val">${renderField(first[COLS.EFECTO], 'EFECTO')}</div></div>
+                            <div class="info-card"><div class="info-label">Acabados</div><div class="info-val">${Array.from(finishesSet).join(', ') || '-'}</div></div>
+                            <div class="info-card"><div class="info-label">Uso</div><div class="info-val text-sm">${Array.from(usosSet).join(', ') || '-'}</div></div>
+                            <div class="info-card"><div class="info-label">Variación</div><div class="info-val">${renderVariation(first[COLS.VARIACION])}</div></div>
+                            <div class="info-card"><div class="info-label">Medidas</div><div class="info-val text-xs leading-tight font-tech text-gray-600">${measuresStr}</div></div>
+                        </div>
                     </div>
                 </div>
-            </div>
-        </div>
-        `;
+            `;
+            
+            // Health Check
+            html += analyzeDataHealth(rows);
 
+            // Tabla
             html += `
-        <div class="panel mb-8 animate-enter delay-200">
-            <div class="px-6 py-4 border-b border-gray-100 bg-white flex justify-between items-center">
-                <h3 class="font-bold text-gray-800 flex items-center gap-2">
-                    <i data-lucide="list" class="w-4 h-4 text-gray-400"></i> Listado de Artículos
-                </h3>
-                <span class="text-xs font-bold text-gray-500 bg-gray-100 px-2 py-1 rounded-full">${rows.length} SKUs</span>
-            </div>
-            <div class="overflow-x-auto">
-                <table class="audit-table">
-                    <thead>
-                        <tr>
-                            <th width="50" class="text-center"></th>
-                            <th width="90">Visu</th>
-                            <th>Referencia</th>
-                            <th>Especificaciones</th>
-                            <th>Técnica</th>
-                            <th width="100" class="text-right">PVP</th>
-                            <th width="120" class="text-right">Estado</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                    `;
+                <div class="panel mb-8 animate-enter delay-200">
+                    <div class="px-6 py-4 border-b border-gray-100 bg-white flex justify-between items-center">
+                        <h3 class="font-bold text-gray-800 flex items-center gap-2"><i data-lucide="list" class="w-4 h-4 text-gray-400"></i> Listado</h3>
+                        <span class="text-xs font-bold text-gray-500 bg-gray-100 px-2 py-1 rounded-full">${rows.length} SKUs</span>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="audit-table">
+                            <thead><tr><th width="50"></th><th width="90">Visu</th><th>Referencia</th><th>Especificaciones</th><th>Técnica</th><th width="100" class="text-right">PVP</th><th width="120" class="text-right">Estado</th></tr></thead>
+                            <tbody>
+            `;
 
+            // Sort logic
             const getGroupLabel = (r) => {
                 const medida = safeVal(r[COLS.MEDIDA]);
                 const espesor = safeVal(r[COLS.ESPESOR]).toUpperCase();
@@ -2108,880 +1903,385 @@
                 if (nombre.includes('EXT') || nombre.includes('DUP')) return `${medida} [EXT]`;
                 return medida;
             };
-
-            rows.sort((a, b) => {
-                const areaA = parseFloat(safeVal(a[COLS.AREA]).replace(',', '.') || 0);
-                const areaB = parseFloat(safeVal(b[COLS.AREA]).replace(',', '.') || 0);
-                if (areaB !== areaA) return areaB - areaA;
-                const labelA = getGroupLabel(a);
-                const labelB = getGroupLabel(b);
-                if (labelA !== labelB) return labelA.localeCompare(labelB);
-                return (a[COLS.NOMBRE] || '').localeCompare(b[COLS.NOMBRE] || '');
+            rows.sort((a,b) => {
+                const diffArea = parseFloat(safeVal(b[COLS.AREA])) - parseFloat(safeVal(a[COLS.AREA]));
+                if(diffArea !== 0) return diffArea;
+                return getGroupLabel(a).localeCompare(getGroupLabel(b)) || (a[COLS.NOMBRE]||'').localeCompare(b[COLS.NOMBRE]||'');
             });
 
             let lastLabel = null;
-
             rows.forEach(row => {
                 const id = row[COLS.ID];
                 const currentLabel = getGroupLabel(row);
-
-                if (currentLabel !== lastLabel) {
-                    let sepIcon = 'ruler';
-                    let sepClass = 'text-gray-400';
-                    let sepTextClass = 'text-gray-700';
-
-                    if (currentLabel.includes('[20MM]')) {
-                        sepIcon = 'layers';
-                        sepClass = 'text-orange-500';
-                        sepTextClass = 'text-orange-800 bg-orange-50 px-2 py-1 rounded';
-                    } else if (currentLabel.includes('[EXT]')) {
-                        sepIcon = 'sun';
-                        sepClass = 'text-blue-500';
-                        sepTextClass = 'text-blue-800 bg-blue-50 px-2 py-1 rounded';
-                    }
-
-                    html += `
-                    <tr class="row-separator">
-                        <td colspan="7">
-                            <div class="separator-content ${sepTextClass} inline-flex items-center gap-2">
-                                <i data-lucide="${sepIcon}" class="w-4 h-4 ${sepClass}"></i>
-                                FORMATO: ${currentLabel}
-                            </div>
-                        </td>
-                    </tr>
-                `;
+                if(currentLabel !== lastLabel) {
+                    html += `<tr class="row-separator"><td colspan="7"><div class="separator-content"><i data-lucide="ruler" class="w-4 h-4"></i> FORMATO: ${currentLabel}</div></td></tr>`;
                     lastLabel = currentLabel;
                 }
 
                 const res = APP_STATE.auditResults[id] || {};
-                let rowClass = 'row-base';
-                let iconName = 'circle';
-                let iconColor = 'text-gray-300';
-
-                if (res.status === 'ok') {
-                    rowClass = 'row-ok';
-                    iconName = 'check-circle-2';
-                    iconColor = 'text-green-500';
-                } else if (res.status === 'error') {
-                    rowClass = 'row-error';
-                    iconName = 'alert-circle';
-                    iconColor = 'text-red-500';
-                }
-
-                const techClase = safeVal(row[COLS.CLASE]);
-                const techR = safeVal(row[COLS.R]);
-                const techDin = safeVal(row[COLS.LETRA]);
-                const techPtv = safeVal(row[COLS.PTV]);
-
-                // Fecha Badge
-                let dateBadge = '';
-                if (row[COLS.FECHA_ALTA]) {
-                    dateBadge = `<span class="ml-2 text-[10px] font-bold text-blue-600 bg-blue-50 border border-blue-100 px-1.5 py-0.5 rounded inline-flex items-center gap-1"><i data-lucide="calendar" class="w-3 h-3"></i> ${row[COLS.FECHA_ALTA]}</span>`;
-                }
+                const rowClass = res.status === 'ok' ? 'row-ok' : (res.status === 'error' ? 'row-error' : 'row-base');
+                const icon = res.status === 'ok' ? 'check-circle-2' : (res.status === 'error' ? 'alert-circle' : 'circle');
+                const iconColor = res.status === 'ok' ? 'text-green-500' : (res.status === 'error' ? 'text-red-500' : 'text-gray-300');
+                
+                let dateBadge = row[COLS.FECHA_ALTA] ? `<span class="ml-2 text-[10px] font-bold text-blue-600 bg-blue-50 border border-blue-100 px-1.5 py-0.5 rounded inline-flex items-center gap-1"><i data-lucide="calendar" class="w-3 h-3"></i> ${row[COLS.FECHA_ALTA]}</span>` : '';
 
                 html += `
                 <tr id="row-${id}" class="${rowClass}">
-                    <td class="text-center">
-                        <i data-lucide="${iconName}" class="${iconColor} mx-auto w-5 h-5"></i>
-                    </td>
-                    <td>
-                        <div class="thumb-container" onclick="openArticleModal('${id}')" title="Ampliar información">
-                            ${hasValue(row[COLS.IMAGEN])
-                        ? `<img src="${row[COLS.IMAGEN]}" class="thumb-img" loading="lazy" onerror="this.style.display='none';">`
-                        : `<span class="text-[9px] text-center text-gray-400 font-bold">NO IMG</span>`
-                    }
+                    <td class="text-center"><i data-lucide="${icon}" class="${iconColor} mx-auto w-5 h-5"></i></td>
+                    <td><div class="thumb-container" onclick="openArticleModal('${id}')">${hasValue(row[COLS.IMAGEN]) ? `<img src="${row[COLS.IMAGEN]}" class="thumb-img" loading="lazy">` : `<span class="text-[9px] text-center text-gray-400 font-bold">NO IMG</span>`}</div></td>
+                    <td><div class="font-bold text-gray-800 text-sm mb-1">${renderField(row[COLS.NOMBRE], 'NOMBRE')} ${dateBadge}</div><div class="text-gray-400 text-[11px] font-mono">#${id}</div></td>
+                    <td><div class="text-xs space-y-1">
+                        <div><span class="text-label">COLOR</span> ${renderField(row[COLS.COLOR], 'COLOR')}</div>
+                        <div><span class="text-label">ACABADO</span> <span class="font-bold text-blue-600 uppercase text-[11px]">${renderField(row[COLS.ACABADO_ART], 'ACABADO')}</span></div>
+                        <div><span class="text-label">ESP</span> ${renderField(row[COLS.ESPESOR], 'ESP')}</div>
+                    </div></td>
+                    <td><div class="text-xs">
+                        <div class="mb-2"><span class="text-label">GRÁFICAS</span> <span class="font-bold text-gray-700 bg-gray-100 px-2 py-0.5 rounded font-tech">${safeVal(row[COLS.GRAFICAS]) || '-'}</span></div>
+                        <div class="flex flex-wrap gap-1 max-w-[220px]">
+                             ${safeVal(row[COLS.PEI]) ? `<span class="tech-pill">PEI ${row[COLS.PEI]}</span>` : ''}
+                             ${safeVal(row[COLS.CLASE]) ? `<span class="tech-pill">CTE ${row[COLS.CLASE]}</span>` : ''}
+                             ${safeVal(row[COLS.R]) ? `<span class="tech-pill">R${row[COLS.R].replace(/R/i,'')}</span>` : ''}
                         </div>
-                    </td>
-                    <td>
-                        <div class="font-bold text-gray-800 text-sm mb-1 flex items-center flex-wrap">
-                            ${renderField(row[COLS.NOMBRE], 'NOMBRE')}
-                            ${dateBadge}
-                        </div>
-                        <div class="inline-flex text-gray-400 text-[11px] font-mono" title="ID Articulo">#${id || '---'}</div>
-                    </td>
-                    <td>
-                        <div class="text-xs space-y-1">
-                            <div><span class="text-label">COLOR</span> ${renderField(row[COLS.COLOR], 'COLOR')}</div>
-                            <div><span class="text-label">ACABADO</span> <span class="font-bold text-blue-600 uppercase text-[11px]">${renderField(row[COLS.ACABADO_ART], 'ACABADO')}</span></div>
-                            <div><span class="text-label">ESP</span> <span class="font-tech text-gray-600">${renderField(row[COLS.ESPESOR], 'ESP')}</span></div>
-                        </div>
-                    </td>
-                    <td>
-                        <div class="text-xs">
-                            <div class="mb-2 flex items-center gap-1">
-                                <span class="text-label">GRÁFICAS</span> 
-                                <span class="font-bold text-gray-700 bg-gray-100 px-2 py-0.5 rounded font-tech">${safeVal(row[COLS.GRAFICAS]) || '-'}</span>
-                            </div>
-                            
-                            <div class="flex flex-wrap max-w-[220px]">
-                                ${hasValue(row[COLS.PEI]) ? `<span class="tech-pill text-blue-600 bg-blue-50 border-blue-100">PEI ${row[COLS.PEI]}</span>` : ''}
-                                ${techClase ? `<span class="tech-pill ${['2', '3'].some(x => techClase.includes(x)) ? 'high' : ''}">CTE ${techClase}</span>` : ''}
-                                ${techR ? `<span class="tech-pill ${['10', '11', '12', '13'].some(x => techR.includes(x)) ? 'high' : ''}">R${techR.replace(/R/i, '')}</span>` : ''}
-                                ${techDin ? `<span class="tech-pill ${['B', 'C'].some(x => techDin.includes(x)) ? 'high' : ''}">DIN ${techDin}</span>` : ''}
-                                ${techPtv ? `<span class="tech-pill">PTV ${techPtv}</span>` : ''}
-                            </div>
-                        </div>
-                    </td>
-                    <td class="text-right">
-                        ${renderField(row[COLS.GRUPO_PRECIO], '€', true)}
-                    </td>
-                    <td class="text-right">
-                        <div class="flex justify-end gap-2">
-                            <button onclick="setStatus('${id}', 'ok')" class="w-8 h-8 flex items-center justify-center hover:bg-green-100 rounded-full text-green-600 transition" title="Correcto">
-                                <i data-lucide="check" class="w-4 h-4"></i>
-                            </button>
-                            <button onclick="reportError('${id}')" class="w-8 h-8 flex items-center justify-center hover:bg-red-100 rounded-full text-red-600 transition" title="Reportar Error">
-                                <i data-lucide="x" class="w-4 h-4"></i>
-                            </button>
-                        </div>
-                    </td>
-                </tr>
-            `;
+                    </div></td>
+                    <td class="text-right">${renderField(row[COLS.GRUPO_PRECIO], '€', true)}</td>
+                    <td class="text-right"><div class="flex justify-end gap-2">
+                        <button onclick="setStatus('${id}', 'ok')" class="w-8 h-8 flex items-center justify-center hover:bg-green-100 rounded-full text-green-600"><i data-lucide="check" class="w-4 h-4"></i></button>
+                        <button onclick="reportError('${id}')" class="w-8 h-8 flex items-center justify-center hover:bg-red-100 rounded-full text-red-600"><i data-lucide="x" class="w-4 h-4"></i></button>
+                    </div></td>
+                </tr>`;
             });
             html += `</tbody></table></div></div>`;
-
-            const packingMap = new Map();
-            const techByFinish = {};
-
-            rows.forEach(r => {
-                const pKey = `${safeVal(r[COLS.MEDIDA])}_${safeVal(r[COLS.ESPESOR])}`;
-                if (!packingMap.has(pKey) && (hasValue(r[COLS.PZ_CAJA]) || hasValue(r[COLS.M2_PALLET]))) {
-                    packingMap.set(pKey, r);
-                }
-
-                let fin = safeVal(r[COLS.ACABADO_ART]) || 'GENÉRICO';
-                const nombreArt = safeVal(r[COLS.NOMBRE]).toUpperCase();
-                const espesorArt = safeVal(r[COLS.ESPESOR]).toUpperCase();
-
-                if (espesorArt.startsWith('20') || espesorArt.includes('20MM')) fin = `${fin} [20MM]`;
-                else if (nombreArt.includes('DUP')) fin = `${fin} [DUP]`;
-                else if (nombreArt.includes('EXT')) fin = `${fin} [EXT]`;
-
-                if (!techByFinish[fin]) techByFinish[fin] = { cte: new Set(), r: new Set(), din: new Set(), ptv: new Set() };
-                if (hasValue(r[COLS.CLASE])) techByFinish[fin].cte.add(r[COLS.CLASE]);
-                if (hasValue(r[COLS.R])) techByFinish[fin].r.add(r[COLS.R]);
-                if (hasValue(r[COLS.LETRA])) techByFinish[fin].din.add(r[COLS.LETRA]);
-                if (hasValue(r[COLS.PTV])) techByFinish[fin].ptv.add(r[COLS.PTV]);
-            });
-
-            const packingList = Array.from(packingMap.values()).sort((a, b) => {
-                const areaA = parseFloat(safeVal(a[COLS.AREA]).replace(',', '.') || 0);
-                const areaB = parseFloat(safeVal(b[COLS.AREA]).replace(',', '.') || 0);
-                return areaB - areaA;
-            });
-
-            // CONDICIONAL: Si hay filtro de fecha, ocultar packing
-            const showPacking = !APP_STATE.dateFilter.active;
-
-            html += `
-        <div class="grid grid-cols-1 ${showPacking ? 'lg:grid-cols-2' : ''} gap-6 pb-12">
-            ${showPacking ? `
-            <div class="panel p-6">
-                <h4 class="font-bold text-gray-800 border-b border-gray-100 pb-3 mb-4 flex items-center gap-2 text-sm uppercase tracking-wide">
-                    <i data-lucide="package" class="w-4 h-4 text-gray-400"></i> Datos de Packing
-                </h4>
-                <div class="overflow-x-auto">
-                    <table class="w-full text-xs text-left border-collapse">
-                        <thead class="text-gray-400 font-bold uppercase tracking-wider">
-                            <tr>
-                                <th class="p-2 border-b border-gray-100">Formato</th>
-                                <th class="p-2 border-b border-gray-100">Pz/Cj</th>
-                                <th class="p-2 border-b border-gray-100">M2/Cj</th>
-                                <th class="p-2 border-b border-gray-100">Cj/Pal</th>
-                                <th class="p-2 border-b border-gray-100">M2/Pal</th>
-                                <th class="p-2 border-b border-gray-100">Kg/Cj</th>
-                                <th class="p-2 border-b border-gray-100">Kg/Pal</th>
-                            </tr>
-                        </thead>
-                        <tbody class="divide-y divide-gray-50 font-tech text-gray-600">
-                            ${packingList.map(p => `
-                                <tr class="hover:bg-gray-50">
-                                    <td class="p-2 font-bold text-gray-800 font-main">${safeVal(p[COLS.MEDIDA])} <span class="text-gray-400 font-normal">(${safeVal(p[COLS.ESPESOR])})</span></td>
-                                    <td class="p-2">${safeVal(p[COLS.PZ_CAJA]) || '-'}</td>
-                                    <td class="p-2">${safeVal(p[COLS.M2_CAJA]) || '-'}</td>
-                                    <td class="p-2">${safeVal(p[COLS.CJ_PALLET]) || '-'}</td>
-                                    <td class="p-2">${safeVal(p[COLS.M2_PALLET]) || '-'}</td>
-                                    <td class="p-2">${safeVal(p[COLS.KG_CAJA]) || '-'}</td>
-                                    <td class="p-2 font-bold">${safeVal(p[COLS.KG_PALLET]) || '-'}</td>
-                                </tr>
-                            `).join('')}
-                        </tbody>
-                    </table>
-                </div>
-            </div>` : ''}
-
-            <div class="panel p-6">
-                <h4 class="font-bold text-gray-800 border-b border-gray-100 pb-3 mb-4 flex items-center gap-2 text-sm uppercase tracking-wide">
-                    <i data-lucide="flask-conical" class="w-4 h-4 text-gray-400"></i> Resumen Técnico
-                </h4>
-                <div class="space-y-3 text-sm">
-                    ${Object.keys(techByFinish).map(fin => {
-                const data = techByFinish[fin];
-                if (data.cte.size === 0 && data.r.size === 0 && data.din.size === 0 && data.ptv.size === 0) return '';
-
-                return `
-                        <div class="border border-gray-200 rounded-lg bg-gray-50 p-4 hover:shadow-sm transition-shadow">
-                            <div class="font-bold text-gray-800 mb-2 border-b border-gray-200 pb-2 uppercase text-xs tracking-wider flex items-center gap-2">
-                                <div class="w-2 h-2 rounded-full bg-blue-500"></div> ${fin}
-                            </div>
-                            <div class="grid grid-cols-2 gap-y-2 gap-x-6 font-tech text-xs">
-                                ${data.cte.size ? `<div class="flex justify-between"><span class="text-gray-500">CTE:</span> <span class="font-bold text-gray-800">${Array.from(data.cte).join(', ')}</span></div>` : ''}
-                                ${data.r.size ? `<div class="flex justify-between"><span class="text-gray-500">R:</span> <span class="font-bold text-gray-800">${Array.from(data.r).join(', ')}</span></div>` : ''}
-                                ${data.din.size ? `<div class="flex justify-between"><span class="text-gray-500">DIN:</span> <span class="font-bold text-gray-800">${Array.from(data.din).join(', ')}</span></div>` : ''}
-                                ${data.ptv.size ? `<div class="flex justify-between"><span class="text-gray-500">PTV:</span> <span class="font-bold text-gray-800">${Array.from(data.ptv).join(', ')}</span></div>` : ''}
-                            </div>
-                        </div>
-                        `;
-            }).join('')}
-                </div>
-            </div>
-        </div>
-        `;
-
-            // MEJORA 4: Data Health Check
-            const healthHTML = analyzeDataHealth(rows);
-
-            // Insertar antes de la tabla
-            const tableStart = html.indexOf('<div class="panel mb-8 animate-enter delay-200">');
-            if (tableStart !== -1 && healthHTML) {
-                html = html.slice(0, tableStart) + healthHTML + html.slice(tableStart);
+            
+            // Packing & Tech Summary (Solo si no filtro fecha)
+            if(!APP_STATE.dateFilter.active) {
+                html += `<div class="grid grid-cols-1 lg:grid-cols-2 gap-6 pb-12">
+                    <div class="panel p-6"><h4 class="font-bold text-gray-800 border-b border-gray-100 pb-3 mb-4 text-sm uppercase">Packing</h4>
+                        <table class="w-full text-xs text-left">
+                            <thead class="text-gray-400"><tr><th>Fmt</th><th>Pz/Cj</th><th>M2/Cj</th><th>M2/Pal</th><th>Kg/Pal</th></tr></thead>
+                            <tbody class="text-gray-600 font-tech divide-y divide-gray-50">
+                                ${packingList.map(p => `<tr><td class="p-2 font-bold font-main">${safeVal(p[COLS.MEDIDA])}</td><td>${safeVal(p[COLS.PZ_CAJA])}</td><td>${safeVal(p[COLS.M2_CAJA])}</td><td>${safeVal(p[COLS.M2_PALLET])}</td><td>${safeVal(p[COLS.KG_PALLET])}</td></tr>`).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="panel p-6"><h4 class="font-bold text-gray-800 border-b border-gray-100 pb-3 mb-4 text-sm uppercase">Técnica</h4>
+                        <div class="space-y-3 text-sm">${Object.keys(techByFinish).map(fin => {
+                            const d = techByFinish[fin];
+                            if(!d.cte.size && !d.r.size) return '';
+                            return `<div class="bg-gray-50 p-3 rounded border border-gray-200"><div class="font-bold text-xs uppercase mb-1 text-blue-800">${fin}</div><div class="text-xs text-gray-600">CTE: ${Array.from(d.cte).join(', ') || '-'} | R: ${Array.from(d.r).join(', ') || '-'}</div></div>`;
+                        }).join('')}</div>
+                    </div>
+                </div>`;
             }
 
             container.innerHTML = html;
-
-            // Re-aplicar modo compacto si estaba activo
-            if (APP_STATE.compactMode) {
-                document.getElementById('serie-content').classList.add('compact-mode');
-                const btn = document.getElementById('btn-compact');
-                if (btn) btn.classList.add('bg-gray-200');
-            }
-
-            APP_STATE.focusedRowIndex = -1; // Reset teclado
-            if (window.lucide) lucide.createIcons();
+            if(APP_STATE.compactMode) toggleCompactMode(); // re-apply
+            if(window.lucide) lucide.createIcons();
+            APP_STATE.focusedRowIndex = -1;
         }
 
-        // ============================================================
-        // MEJORAS: FUNCIONES NUEVAS
-        // ============================================================
-
-        // 1. MODO COMPACTO
+        // --- EXTRAS ---
         function toggleCompactMode() {
             APP_STATE.compactMode = !APP_STATE.compactMode;
-            const container = document.getElementById('serie-content');
-            const btn = document.getElementById('btn-compact');
-
-            if (APP_STATE.compactMode) {
-                container.classList.add('compact-mode');
-                if (btn) btn.classList.add('bg-gray-200');
-            } else {
-                container.classList.remove('compact-mode');
-                if (btn) btn.classList.remove('bg-gray-200');
-            }
+            const c = document.getElementById('serie-content');
+            const b = document.getElementById('btn-compact');
+            if(APP_STATE.compactMode) { c.classList.add('compact-mode'); if(b) b.classList.add('bg-gray-200'); }
+            else { c.classList.remove('compact-mode'); if(b) b.classList.remove('bg-gray-200'); }
         }
 
-        // 4. DATA HEALTH
         function analyzeDataHealth(rows) {
-            let missingPrice = 0;
-            let missingPacking = 0;
-            let missingWeight = 0;
-
-            rows.forEach(r => {
-                if (!hasValue(r[COLS.GRUPO_PRECIO])) missingPrice++;
-                if (!hasValue(r[COLS.PZ_CAJA]) && !hasValue(r[COLS.M2_PALLET])) missingPacking++;
-                if (!hasValue(r[COLS.KG_CAJA]) && !hasValue(r[COLS.KG_PALLET])) missingWeight++;
-            });
-
-            if (missingPrice === 0 && missingPacking === 0 && missingWeight === 0) return '';
-
-            let html = '<div class="mb-6 animate-enter delay-100">';
-            if (missingPrice > 0) {
-                html += `<div class="health-alert error" onclick="filterByIssue('price')">
-                            <div class="flex items-center gap-2"><i data-lucide="alert-triangle" class="text-red-500 w-4 h-4"></i> <strong>${missingPrice}</strong> artículos sin Grupo de Precio</div>
-                            <i data-lucide="chevron-right" class="text-gray-400 w-4 h-4"></i>
-                         </div>`;
-            }
-            if (missingPacking > 0) {
-                html += `<div class="health-alert" onclick="filterByIssue('packing')">
-                            <div class="flex items-center gap-2"><i data-lucide="package-x" class="text-orange-500 w-4 h-4"></i> <strong>${missingPacking}</strong> artículos sin Packing</div>
-                            <i data-lucide="chevron-right" class="text-gray-400 w-4 h-4"></i>
-                         </div>`;
-            }
-            html += '</div>';
-            return html;
+            let p=0, k=0;
+            rows.forEach(r => { if(!hasValue(r[COLS.GRUPO_PRECIO])) p++; if(!hasValue(r[COLS.PZ_CAJA])) k++; });
+            if(p===0 && k===0) return '';
+            return `<div class="mb-6 animate-enter delay-100">
+                ${p>0 ? `<div class="health-alert error" onclick="filterByIssue('price')"><div><i data-lucide="alert-triangle" class="text-red-500 w-4 h-4 inline mr-2"></i><b>${p}</b> sin Precio</div></div>` : ''}
+                ${k>0 ? `<div class="health-alert" onclick="filterByIssue('packing')"><div><i data-lucide="package-x" class="text-orange-500 w-4 h-4 inline mr-2"></i><b>${k}</b> sin Packing</div></div>` : ''}
+            </div>`;
         }
 
-        window.filterByIssue = function (issue) {
+        window.filterByIssue = function(issue) {
             const rows = document.querySelectorAll('#serie-content tbody tr:not(.row-separator)');
             rows.forEach(tr => {
                 const id = tr.id.replace('row-', '');
-                const data = APP_STATE.data.find(d => d[COLS.ID] === id);
+                const d = APP_STATE.data.find(x => x[COLS.ID] === id);
                 let show = true;
-                if (issue === 'price' && hasValue(data[COLS.GRUPO_PRECIO])) show = false;
-                if (issue === 'packing' && (hasValue(data[COLS.PZ_CAJA]) || hasValue(data[COLS.M2_PALLET]))) show = false;
-
+                if(issue === 'price' && hasValue(d[COLS.GRUPO_PRECIO])) show = false;
+                if(issue === 'packing' && hasValue(d[COLS.PZ_CAJA])) show = false;
                 tr.style.display = show ? '' : 'none';
             });
-            alert("Filtrando por incidencias. Para ver todo de nuevo, recarga la serie desde el menú lateral.");
         };
 
-        // 2. NAVEGACIÓN TECLADO
         function initKeyboardNav() {
             document.addEventListener('keydown', (e) => {
-                if (!APP_STATE.currentSerie) return;
-                if (document.getElementById('article-modal').classList.contains('visible')) return;
-
+                if (!APP_STATE.currentSerie || document.getElementById('article-modal').classList.contains('visible')) return;
                 const rows = Array.from(document.querySelectorAll('#serie-content tbody tr:not(.row-separator)'));
                 if (rows.length === 0) return;
-
-                if (e.key === 'ArrowDown') {
-                    e.preventDefault();
-                    APP_STATE.focusedRowIndex = Math.min(APP_STATE.focusedRowIndex + 1, rows.length - 1);
-                    updateFocus(rows);
-                } else if (e.key === 'ArrowUp') {
-                    e.preventDefault();
-                    APP_STATE.focusedRowIndex = Math.max(APP_STATE.focusedRowIndex - 1, 0);
-                    updateFocus(rows);
-                } else if (e.key === 'Enter') {
-                    e.preventDefault();
-                    if (APP_STATE.focusedRowIndex >= 0) {
-                        const id = rows[APP_STATE.focusedRowIndex].id.replace('row-', '');
-                        setStatus(id, 'ok');
-                        APP_STATE.focusedRowIndex = Math.min(APP_STATE.focusedRowIndex + 1, rows.length - 1);
-                        updateFocus(rows);
-                    }
-                } else if (e.key === 'x' || e.key === 'X') {
-                    e.preventDefault();
-                    if (APP_STATE.focusedRowIndex >= 0) {
-                        const id = rows[APP_STATE.focusedRowIndex].id.replace('row-', '');
-                        reportError(id);
-                    }
-                }
+                if (e.key === 'ArrowDown') { e.preventDefault(); APP_STATE.focusedRowIndex = Math.min(APP_STATE.focusedRowIndex + 1, rows.length - 1); updateFocus(rows); } 
+                else if (e.key === 'ArrowUp') { e.preventDefault(); APP_STATE.focusedRowIndex = Math.max(APP_STATE.focusedRowIndex - 1, 0); updateFocus(rows); } 
+                else if (e.key === 'Enter' && APP_STATE.focusedRowIndex >= 0) { e.preventDefault(); setStatus(rows[APP_STATE.focusedRowIndex].id.replace('row-', ''), 'ok'); }
             });
         }
-
         function updateFocus(rows) {
             rows.forEach(r => r.classList.remove('row-focused'));
-            if (APP_STATE.focusedRowIndex >= 0 && rows[APP_STATE.focusedRowIndex]) {
-                const row = rows[APP_STATE.focusedRowIndex];
-                row.classList.add('row-focused');
-                row.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            }
+            if(APP_STATE.focusedRowIndex >= 0) { rows[APP_STATE.focusedRowIndex].classList.add('row-focused'); rows[APP_STATE.focusedRowIndex].scrollIntoView({behavior:'smooth', block:'center'}); }
         }
 
-        // ============================================================
-        // FUNCIONES DEL MODAL
-        // ============================================================
+        // --- MODAL ---
         function openArticleModal(id) {
             const art = APP_STATE.data.find(a => a[COLS.ID] === id);
             if (!art) return;
-
-            const modal = document.getElementById('article-modal');
-            const content = modal.querySelector('.modal-content');
-
-            content.innerHTML = `
-            <div class="modal-header">
-                <div>
-                    <h3 class="text-xl font-bold text-gray-900">${art[COLS.NOMBRE]}</h3>
-                    <div class="text-sm text-gray-500 font-mono">ID: ${id} | ${art[COLS.SERIE]}</div>
+            const m = document.getElementById('article-modal');
+            m.querySelector('.modal-content').innerHTML = `
+                <div class="modal-header">
+                    <div><h3 class="text-xl font-bold">${art[COLS.NOMBRE]}</h3><div class="text-sm text-gray-500">ID: ${id}</div></div>
+                    <button onclick="closeModal()" class="text-gray-400"><i data-lucide="x-circle" class="w-8 h-8"></i></button>
                 </div>
-                <div class="flex items-center gap-3">
-                    <button onclick="setStatus('${id}', 'ok'); closeModal()" class="btn-accion text-xs bg-green-600 hover:bg-green-700 shadow-none"><i data-lucide="check" class="w-4 h-4"></i> Validar</button>
-                    <button onclick="reportError('${id}'); closeModal()" class="btn-accion text-xs bg-red-600 hover:bg-red-700 shadow-none"><i data-lucide="x" class="w-4 h-4"></i> Reportar</button>
-                    <button onclick="closeModal()" class="text-gray-400 hover:text-gray-600"><i data-lucide="x-circle" class="w-8 h-8"></i></button>
-                </div>
-            </div>
-            <div class="modal-body">
-                <div class="modal-img-wrapper">
-                    ${hasValue(art[COLS.IMAGEN])
-                    ? `<img src="${art[COLS.IMAGEN]}" class="modal-img">`
-                    : `<span class="text-gray-400 font-bold">Sin imagen</span>`
-                }
-                </div>
-                <div>
-                    <div class="modal-details-section">
-                        <h4>Especificaciones</h4>
-                        <div class="detail-row"><span>Formato</span> <span>${renderField(art[COLS.MEDIDA], 'MEDIDA')}</span></div>
-                        <div class="detail-row"><span>Color</span> <span>${renderField(art[COLS.COLOR], 'COLOR')}</span></div>
-                        <div class="detail-row"><span>Acabado</span> <span>${renderField(art[COLS.ACABADO_ART], 'ACABADO')}</span></div>
-                        <div class="detail-row"><span>Espesor</span> <span>${renderField(art[COLS.ESPESOR], 'ESP')} mm</span></div>
-                        <div class="detail-row"><span>Gráficas</span> <span>${safeVal(art[COLS.GRAFICAS])}</span></div>
-                        <div class="detail-row"><span>Grupo Precio</span> <span class="text-lg text-red-700">${renderField(art[COLS.GRUPO_PRECIO], 'PVP', true)}</span></div>
-                    </div>
-
-                    <div class="modal-details-section mt-6">
-                        <h4>Datos Técnicos</h4>
-                        <div class="grid grid-cols-2 gap-4">
-                             <div class="detail-row"><span>CTE (Clase)</span> <span>${safeVal(art[COLS.CLASE]) || '-'}</span></div>
-                             <div class="detail-row"><span>R (Desliz.)</span> <span>${safeVal(art[COLS.R]) || '-'}</span></div>
-                             <div class="detail-row"><span>DIN</span> <span>${safeVal(art[COLS.LETRA]) || '-'}</span></div>
-                             <div class="detail-row"><span>PTV</span> <span>${safeVal(art[COLS.PTV]) || '-'}</span></div>
-                             <div class="detail-row"><span>PEI</span> <span>${safeVal(art[COLS.PEI]) || '-'}</span></div>
+                <div class="modal-body">
+                    <div class="modal-img-wrapper">${hasValue(art[COLS.IMAGEN]) ? `<img src="${art[COLS.IMAGEN]}" class="modal-img">` : 'No Image'}</div>
+                    <div>
+                        <div class="modal-details-section"><h4>Datos</h4>
+                             <div class="detail-row"><span>Fmt</span><span>${art[COLS.MEDIDA]}</span></div>
+                             <div class="detail-row"><span>Color</span><span>${art[COLS.COLOR]}</span></div>
+                             <div class="detail-row"><span>Precio</span><span class="text-red-600 font-bold">${art[COLS.GRUPO_PRECIO]}</span></div>
+                        </div>
+                        <div class="modal-details-section mt-6"><h4>Packing</h4>
+                             <div class="grid grid-cols-2 gap-4 text-sm">
+                                <div>Box: <b>${art[COLS.PZ_CAJA]}</b> pz</div>
+                                <div>Pal: <b>${art[COLS.M2_PALLET]}</b> m2</div>
+                             </div>
                         </div>
                     </div>
-
-                    <div class="modal-details-section mt-6">
-                        <h4>Packing Individual</h4>
-                        <div class="grid grid-cols-2 gap-4 text-sm text-gray-600 font-tech">
-                             <div>Pz/Caja: <span class="font-bold text-gray-900">${safeVal(art[COLS.PZ_CAJA])}</span></div>
-                             <div>M2/Caja: <span class="font-bold text-gray-900">${safeVal(art[COLS.M2_CAJA])}</span></div>
-                             <div>Cj/Pallet: <span class="font-bold text-gray-900">${safeVal(art[COLS.CJ_PALLET])}</span></div>
-                             <div>M2/Pallet: <span class="font-bold text-gray-900">${safeVal(art[COLS.M2_PALLET])}</span></div>
-                             <div>Kg/Caja: <span class="font-bold text-gray-900">${safeVal(art[COLS.KG_CAJA])}</span></div>
-                             <div>Kg/Pallet: <span class="font-bold text-gray-900">${safeVal(art[COLS.KG_PALLET])}</span></div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        `;
-
-            modal.classList.add('visible');
+                </div>`;
+            m.classList.add('visible');
             lucide.createIcons();
-            modal.onclick = (e) => { if (e.target === modal) closeModal(); };
             document.onkeydown = (e) => { if (e.key === 'Escape') closeModal(); };
         }
+        function closeModal() { document.getElementById('article-modal').classList.remove('visible'); document.onkeydown = null; }
 
-        function closeModal() {
-            const modal = document.getElementById('article-modal');
-            modal.classList.remove('visible');
-            document.onkeydown = null;
-        }
-
-        // --- 6. ACCIONES ---
-        window.setStatus = function (id, status, comment = '') {
+        // --- ACCIONES DE ESTADO ---
+        window.setStatus = function(id, status, comment = '') {
             APP_STATE.auditResults[id] = { status, comment, date: new Date().toISOString() };
             localStorage.setItem('audit_results_v1', JSON.stringify(APP_STATE.auditResults));
-
             const row = document.getElementById(`row-${id}`);
-            if (row) {
-                row.className = (status === 'ok' ? 'row-ok' : 'row-error');
-                const iconCell = row.querySelector('td:first-child i');
-
-                if (status === 'ok') {
-                    iconCell.setAttribute('data-lucide', 'check-circle-2');
-                    iconCell.className = 'text-green-500 mx-auto w-5 h-5';
-                } else {
-                    iconCell.setAttribute('data-lucide', 'alert-circle');
-                    iconCell.className = 'text-red-500 mx-auto w-5 h-5';
-                }
+            if(row) {
+                row.className = status === 'ok' ? 'row-ok' : 'row-error';
+                const i = row.querySelector('td:first-child i');
+                i.setAttribute('data-lucide', status==='ok'?'check-circle-2':'alert-circle');
+                i.className = status==='ok'?'text-green-500 mx-auto w-5 h-5':'text-red-500 mx-auto w-5 h-5';
                 lucide.createIcons();
             }
-            updateSidebarDot(id);
             updateGlobalProgress();
         }
-
-        function updateSidebarDot(articleId) {
-            const art = APP_STATE.data.find(a => a[COLS.ID] === articleId);
-            if (art) {
-                const item = document.querySelector(`.nav-item[data-serie="${art[COLS.SERIE].toLowerCase()}"][data-coll="${art[COLS.COLECCION].toLowerCase()}"]`);
-                if (item) {
-                    const rows = APP_STATE.hierarchy[art[COLS.COLECCION]][art[COLS.SERIE]];
-                    let err = 0, ok = 0;
-                    rows.forEach(r => {
-                        const s = APP_STATE.auditResults[r[COLS.ID]]?.status;
-                        if (s === 'error') err++;
-                        if (s === 'ok') ok++;
-                    });
-                    const existingDot = item.querySelector('.rounded-full');
-                    if (existingDot) existingDot.remove();
-
-                    let dotHTML = '';
-                    if (err > 0) dotHTML = `<div class="w-2 h-2 rounded-full bg-red-500 shadow-sm"></div>`;
-                    else if (ok === rows.length) dotHTML = `<div class="w-2 h-2 rounded-full bg-green-500 shadow-sm"></div>`;
-
-                    if (dotHTML) item.insertAdjacentHTML('beforeend', dotHTML);
-                }
-            }
+        window.reportError = function(id) {
+            const c = prompt("Error:");
+            if(c !== null) setStatus(id, 'error', c || 'Genérico');
         }
-
-        window.reportError = function (id) {
-            const comment = prompt("Describe el error encontrado:");
-            if (comment !== null) setStatus(id, 'error', comment || 'Error genérico');
-        }
-
-        window.markAllOk = function () {
-            if (!confirm("¿Validar TODOS los artículos de esta serie?")) return;
+        window.markAllOk = function() {
+            if(!confirm("¿Validar todo?")) return;
             const rows = APP_STATE.hierarchy[APP_STATE.currentSerie.coll][APP_STATE.currentSerie.name];
-            rows.forEach(r => {
-                APP_STATE.auditResults[r[COLS.ID]] = { status: 'ok', comment: '', date: new Date().toISOString() };
-            });
+            rows.forEach(r => APP_STATE.auditResults[r[COLS.ID]] = { status: 'ok', date: new Date().toISOString() });
             localStorage.setItem('audit_results_v1', JSON.stringify(APP_STATE.auditResults));
             loadSerieView(APP_STATE.currentSerie.name, APP_STATE.currentSerie.coll);
-            if (rows.length > 0) updateSidebarDot(rows[0][COLS.ID]);
             updateGlobalProgress();
         }
-
         function updateGlobalProgress() {
-            const total = APP_STATE.data.length;
-            if (total === 0) return;
-            const reviewed = Object.keys(APP_STATE.auditResults).length;
-            const pct = Math.round((reviewed / total) * 100);
-            document.getElementById('progress-bar').style.width = pct + '%';
-            document.getElementById('progress-text').innerText = `${pct}%`;
+            const t = APP_STATE.data.length; if(t===0) return;
+            const r = Object.keys(APP_STATE.auditResults).length;
+            const p = Math.round((r/t)*100);
+            document.getElementById('progress-bar').style.width = p+'%';
+            document.getElementById('progress-text').innerText = p+'%';
         }
 
+        // --- SEARCH ---
         document.getElementById('global-search').addEventListener('input', (e) => {
-            const term = e.target.value.toLowerCase().trim();
-            const nav = document.getElementById('nav-tree');
-
-            if (term === '') {
-                document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('hidden-item'));
-                document.querySelectorAll('.collection-group').forEach(g => g.style.display = '');
-                return;
-            }
-
-            const groups = nav.querySelectorAll('.collection-group');
-            groups.forEach(group => {
-                let anyVisible = false;
-                const items = group.querySelectorAll('.nav-item');
-                const header = group.querySelector('.collection-header');
-                const container = group.querySelector('.series-container');
-                const icon = header.querySelector('.chevron-icon');
-                const collName = group.dataset.coll;
-                const collMatches = collName.includes(term);
-
-                items.forEach(item => {
-                    const serieName = item.innerText.toLowerCase();
-                    const matches = serieName.includes(term) || collMatches;
-                    if (matches) {
-                        item.classList.remove('hidden-item');
-                        anyVisible = true;
-                    } else {
-                        item.classList.add('hidden-item');
-                    }
+            const t = e.target.value.toLowerCase().trim();
+            const grps = document.querySelectorAll('.collection-group');
+            if(t === '') { grps.forEach(g => { g.style.display=''; g.querySelectorAll('.nav-item').forEach(i=>i.classList.remove('hidden-item')); }); return; }
+            grps.forEach(g => {
+                let vis = false;
+                const items = g.querySelectorAll('.nav-item');
+                const collMatch = g.dataset.coll.includes(t);
+                items.forEach(i => {
+                    if(i.innerText.toLowerCase().includes(t) || collMatch) { i.classList.remove('hidden-item'); vis = true; }
+                    else i.classList.add('hidden-item');
                 });
-
-                if (anyVisible) {
-                    group.style.display = '';
-                    container.style.display = 'block';
-                    container.classList.add('expanded');
-                    icon.classList.add('rotated');
-                } else {
-                    group.style.display = 'none';
-                }
+                g.style.display = vis ? '' : 'none';
+                if(vis) { const c = g.querySelector('.series-container'); c.style.display='block'; c.classList.add('expanded'); }
             });
         });
 
+        // --- EXPORT ERRORES ---
         document.getElementById('btn-export-errors').addEventListener('click', () => {
-            const errors = [];
-            for (const [id, res] of Object.entries(APP_STATE.auditResults)) {
-                if (res.status === 'error') {
-                    const item = APP_STATE.data.find(r => r[COLS.ID] === id) || {};
-                    errors.push({
-                        ID: id,
-                        Coleccion: item[COLS.COLECCION],
-                        Serie: item[COLS.SERIE],
-                        Modelo: item[COLS.NOMBRE],
-                        Error: res.comment,
-                        Fecha: res.date
-                    });
+            const errs = [];
+            for(const [id, res] of Object.entries(APP_STATE.auditResults)) {
+                if(res.status === 'error') {
+                    const i = APP_STATE.data.find(x => x[COLS.ID] === id) || {};
+                    errs.push({ ID: id, Serie: i[COLS.SERIE], Error: res.comment });
                 }
             }
-            if (errors.length === 0) {
-                alert("¡Buen trabajo! No hay errores registrados.");
-                return;
-            }
-            const csv = Papa.unparse(errors, { delimiter: ";" });
-            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            if(!errs.length) { alert("No hay errores."); return; }
+            const csv = Papa.unparse(errs, {delimiter:";"});
+            const blob = new Blob([csv], {type:'text/csv;charset=utf-8;'});
             const url = URL.createObjectURL(blob);
-            const link = document.createElement("a");
-            link.setAttribute("href", url);
-            link.setAttribute("download", "errores_auditoria_" + new Date().toISOString().slice(0, 10) + ".csv");
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
+            const a = document.createElement("a");
+            a.href = url; a.download = "errores.csv";
+            document.body.appendChild(a); a.click(); document.body.removeChild(a);
         });
-        /* ========================================= */
-        /* MODO INFORME (REPORT MODE) - CORREGIDO    */
-        /* ========================================= */
 
+        /* ========================================= */
+        /* MODO INFORME (CORREGIDO Y OPTIMIZADO)     */
+        /* ========================================= */
         function toggleReportMode() {
             try {
-                const mainContent = document.getElementById('main-content');
-                const reportView = document.getElementById('report-view');
+                const main = document.getElementById('main-content');
+                const rep = document.getElementById('report-view');
                 const btn = document.getElementById('btn-report-mode-sidebar');
+                if(!main || !rep) return;
 
-                if (!mainContent || !reportView) return;
-
-                // Si estamos en modo informe, volvemos al modo normal
-                if (reportView.style.display === 'flex') {
-                    reportView.style.display = 'none';
-                    mainContent.style.display = 'flex';
-                    btn.classList.remove('bg-blue-600', 'text-white', 'border-blue-600');
-                    btn.classList.add('bg-blue-50', 'text-blue-700', 'border-blue-200');
+                if (rep.style.display === 'flex') {
+                    rep.style.display = 'none'; main.style.display = 'flex';
+                    btn.classList.replace('bg-blue-600', 'bg-blue-50');
+                    btn.classList.replace('text-white', 'text-blue-700');
+                    btn.classList.replace('border-blue-600', 'border-blue-200');
                     btn.innerHTML = '<i data-lucide="file-spreadsheet" class="w-4 h-4"></i> Generar Informe';
                 } else {
-                    // Activamos modo informe
-                    reportView.style.display = 'flex';
-                    mainContent.style.display = 'none';
-                    btn.classList.remove('bg-blue-50', 'text-blue-700', 'border-blue-200');
-                    btn.classList.add('bg-blue-600', 'text-white', 'border-blue-600');
+                    rep.style.display = 'flex'; main.style.display = 'none';
+                    btn.classList.replace('bg-blue-50', 'bg-blue-600');
+                    btn.classList.replace('text-blue-700', 'text-white');
+                    btn.classList.replace('border-blue-200', 'border-blue-600');
                     btn.innerHTML = '<i data-lucide="arrow-left" class="w-4 h-4"></i> Volver al Catálogo';
                 }
-                if (window.lucide) lucide.createIcons();
-            } catch (err) {
-                console.error("Error al cambiar modo:", err);
-            }
+                if(window.lucide) lucide.createIcons();
+            } catch(e) { console.error(e); }
         }
 
         function generateReport() {
             try {
-                // 1. Obtener Configuración
-                const scopeRadio = document.querySelector('input[name="report-scope"]:checked');
-                const scope = scopeRadio ? scopeRadio.value : 'all';
+                const scope = document.querySelector('input[name="report-scope"]:checked')?.value || 'all';
+                const cols = Array.from(document.querySelectorAll('.col-check:checked')).map(c => c.value);
+                const cont = document.getElementById('report-results');
+                const place = document.getElementById('report-placeholder');
 
-                const checkboxes = document.querySelectorAll('.col-check:checked');
-                const selectedCols = Array.from(checkboxes).map(cb => cb.value);
+                if (cols.length === 0) { alert("Selecciona al menos una columna."); return; }
 
-                const container = document.getElementById('report-results');
-                const placeholder = document.getElementById('report-placeholder');
-
-                if (selectedCols.length === 0) {
-                    alert("⚠️ Por favor, selecciona al menos una columna.");
-                    return;
-                }
-
-                // 2. Filtrar Datos
-                let reportData = [];
-                let title = "";
+                let data = [], title = "";
 
                 if (scope === 'current') {
-                    // MODO SERIE ACTUAL
                     if (!APP_STATE.currentSerie) {
-                        // Error visual controlado
-                        container.innerHTML = `
-                            <div class="flex flex-col items-center justify-center p-12 text-center bg-white rounded-lg border border-red-100 shadow-sm">
-                                <i data-lucide="alert-circle" class="w-12 h-12 text-red-500 mb-4"></i>
-                                <h3 class="text-lg font-bold text-gray-800 mb-2">No hay serie seleccionada</h3>
-                                <p class="text-sm text-gray-600 mb-6">Para usar "Serie Actual", primero debes entrar en una serie del menú.</p>
-                                <button onclick="document.querySelector('input[value=all]').click(); generateReport();" class="px-4 py-2 bg-blue-600 text-white rounded text-sm font-bold hover:bg-blue-700 transition">
-                                    Cambiar a "Todo el Catálogo"
-                                </button>
-                            </div>
-                        `;
-                        container.classList.remove('hidden');
-                        placeholder.classList.add('hidden');
-                        if (window.lucide) lucide.createIcons();
+                        cont.innerHTML = `<div class="p-8 text-center bg-white rounded border border-red-100"><i data-lucide="alert-circle" class="w-8 h-8 text-red-500 mx-auto mb-2"></i><p>No hay serie seleccionada.</p></div>`;
+                        cont.classList.remove('hidden'); place.classList.add('hidden');
+                        if(window.lucide) lucide.createIcons();
                         return;
                     }
-
                     const { name, coll } = APP_STATE.currentSerie;
-                    // Verificar si existe en jerarquia
-                    if (APP_STATE.hierarchy[coll] && APP_STATE.hierarchy[coll][name]) {
-                        reportData = [...APP_STATE.hierarchy[coll][name]];
+                    if(APP_STATE.hierarchy[coll] && APP_STATE.hierarchy[coll][name]) {
+                        data = [...APP_STATE.hierarchy[coll][name]];
                         title = `INFORME: ${name} (${coll})`;
                     }
                 } else {
-                    // MODO TODO EL CATÁLOGO (Aplicando filtros)
-                    reportData = APP_STATE.data.filter(row => {
-                        // Filtro Fecha
-                        if (APP_STATE.dateFilter && APP_STATE.dateFilter.active) {
-                            const { mode, year, month, monthsBack } = APP_STATE.dateFilter;
-                            if (!row._dateObj) return false;
-                            
-                            if (mode === 'custom') {
-                                if (year && row._dateObj.getFullYear() !== year) return false;
-                                if (month !== null && row._dateObj.getMonth() !== month) return false;
-                            } else if (mode && mode.startsWith('recent')) {
-                                const cutoff = new Date();
-                                cutoff.setMonth(cutoff.getMonth() - monthsBack);
-                                cutoff.setHours(0,0,0,0);
-                                if (row._dateObj < cutoff) return false;
-                            }
-                        }
-                        // Filtro Técnica
-                        if (APP_STATE.techFilter && APP_STATE.techFilter.active) {
-                            const { cte, r, din, ptv } = APP_STATE.techFilter;
-                            if (cte && safeVal(row[COLS.CLASE]) !== cte) return false;
-                            if (r && safeVal(row[COLS.R]) !== r) return false;
-                            if (din && safeVal(row[COLS.LETRA]) !== din) return false;
-                            if (ptv && safeVal(row[COLS.PTV]) !== ptv) return false;
-                        }
-                        // Filtro Estructural
-                        if (APP_STATE.structFilter && APP_STATE.structFilter.active) {
-                            const { medida, tipo } = APP_STATE.structFilter;
-                            if (medida && safeVal(row[COLS.MEDIDA]) !== medida) return false;
-                            if (tipo && safeVal(row[COLS.TIPOLOGIA]) !== tipo) return false;
-                        }
-                        return true;
-                    });
-                    title = `INFORME GLOBAL (${reportData.length} Artículos)`;
+                    // MODO GLOBAL: USAR LA FUNCIÓN CENTRALIZADA
+                    data = getFilteredDataGlobal();
+                    title = `INFORME GLOBAL (${data.length} Artículos)`;
                 }
 
-                // 3. Ordenar Datos
-                reportData.sort((a, b) => {
-                    const collA = safeVal(a[COLS.COLECCION]);
-                    const collB = safeVal(b[COLS.COLECCION]);
-                    if (collA !== collB) return collA.localeCompare(collB);
-                    
-                    const serieA = safeVal(a[COLS.SERIE]);
-                    const serieB = safeVal(b[COLS.SERIE]);
-                    if (serieA !== serieB) return serieA.localeCompare(serieB);
-                    
-                    const fmtA = safeVal(a[COLS.MEDIDA]);
-                    const fmtB = safeVal(b[COLS.MEDIDA]);
-                    if (fmtA !== fmtB) return fmtA.localeCompare(fmtB);
-                    
+                // SORT
+                data.sort((a,b) => {
+                    const ca = safeVal(a[COLS.COLECCION]), cb = safeVal(b[COLS.COLECCION]);
+                    if(ca!==cb) return ca.localeCompare(cb);
+                    const sa = safeVal(a[COLS.SERIE]), sb = safeVal(b[COLS.SERIE]);
+                    if(sa!==sb) return sa.localeCompare(sb);
                     return safeVal(a[COLS.NOMBRE]).localeCompare(safeVal(b[COLS.NOMBRE]));
                 });
 
-                // 4. Renderizar
-                renderReportTable(reportData, selectedCols, title);
+                renderReportTable(data, cols, title);
 
-            } catch (err) {
-                console.error("Error generando informe:", err);
-                alert("Ocurrió un error al generar el informe. Revisa la consola (F12) para más detalles.\n\nError: " + err.message);
-            }
+            } catch(e) { console.error(e); alert("Error generando informe: " + e.message); }
         }
 
-        function renderReportTable(data, columns, title) {
-            const container = document.getElementById('report-results');
-            const placeholder = document.getElementById('report-placeholder');
+        function renderReportTable(data, cols, title) {
+            const cont = document.getElementById('report-results');
+            const place = document.getElementById('report-placeholder');
 
-            if (!data || data.length === 0) {
-                container.innerHTML = `
-                    <div class="p-8 text-center text-gray-500 bg-white rounded border border-gray-200 mt-4">
-                        <i data-lucide="search-x" class="w-12 h-12 mx-auto mb-2 text-gray-300"></i>
-                        <p>No se encontraron artículos con los filtros actuales.</p>
-                    </div>`;
-                container.classList.remove('hidden');
-                placeholder.classList.add('hidden');
-                if (window.lucide) lucide.createIcons();
+            if (!data || !data.length) {
+                cont.innerHTML = `<div class="p-8 text-center text-gray-500"><i data-lucide="search-x" class="w-10 h-10 mx-auto mb-2"></i><p>Sin resultados.</p></div>`;
+                cont.classList.remove('hidden'); place.classList.add('hidden');
+                if(window.lucide) lucide.createIcons();
                 return;
             }
 
-            // Etiquetas amigables
-            const colLabels = {
-                'ID': 'ID', 'NOMBRE': 'Nombre', 'COLOR': 'Color', 'GRAFICAS': 'Gráficas',
-                'MEDIDA': 'Medida', 'ESPESOR': 'Espesor', 'ACABADO_ART': 'Acabado', 'TIPOLOGIA': 'Tipología', 'VARIACION': 'Variación',
-                'CLASE': 'CTE', 'R': 'R', 'LETRA': 'DIN', 'PTV': 'PTV', 'PEI': 'PEI',
-                'GRUPO_PRECIO': 'Grupo Precio', 'PZ_CAJA': 'Pz/Cj', 'M2_CAJA': 'M2/Cj', 'M2_PALLET': 'M2/Pal', 'KG_CAJA': 'Kg/Cj', 'KG_PALLET': 'Kg/Pal',
-                'FECHA_ALTA': 'Fecha Alta'
-            };
-
             let html = `
-                <div class="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden mb-8 flex flex-col h-full">
-                    <div class="p-4 border-b border-gray-200 bg-gray-50 flex justify-between items-center sticky top-0 z-10 flex-shrink-0">
-                        <span class="font-bold text-gray-800 text-sm uppercase tracking-wide flex items-center gap-2">
-                             <i data-lucide="file-text" class="w-4 h-4 text-gray-500"></i> ${title}
-                        </span>
-                        <span class="text-xs font-bold bg-blue-100 text-blue-800 px-2 py-1 rounded-full border border-blue-200">${data.length} SKUs</span>
-                    </div>
-                    <div class="overflow-auto flex-1 custom-scrollbar" style="max-height: calc(100vh - 220px);">
-                        <table class="report-table w-full" id="export-table">
-                            <thead>
-                                <tr>
-                                    ${columns.map(col => `<th>${colLabels[col] || col}</th>`).join('')}
-                                </tr>
-                            </thead>
-                            <tbody>
-            `;
-
+            <div class="bg-white rounded-lg shadow-sm border border-gray-200 flex flex-col h-full overflow-hidden">
+                <div class="p-4 border-b bg-gray-50 flex justify-between items-center flex-shrink-0">
+                    <span class="font-bold text-sm uppercase flex gap-2 items-center"><i data-lucide="file-text" class="w-4 h-4"></i> ${title}</span>
+                    <span class="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full font-bold">${data.length} SKUs</span>
+                </div>
+                <div class="overflow-auto flex-1 custom-scrollbar" style="max-height: calc(100vh - 220px);">
+                    <table class="report-table w-full" id="export-table">
+                        <thead><tr>${cols.map(c => `<th>${c}</th>`).join('')}</tr></thead>
+                        <tbody>`;
+            
             let lastSerie = null;
-            let lastFormat = null;
-
             data.forEach(row => {
-                const currentSerie = safeVal(row[COLS.SERIE]);
-                const currentFormat = safeVal(row[COLS.MEDIDA]);
-                const currentColl = safeVal(row[COLS.COLECCION]);
-
-                // Agrupación Serie
-                if (currentSerie !== lastSerie) {
-                    html += `<tr class="bg-gray-100 border-t-2 border-gray-300">
-                        <td colspan="${columns.length}" class="report-group-header py-3 px-4 font-bold text-gray-800">
-                            <div class="flex items-center gap-2">
-                                <i data-lucide="folder-open" class="w-4 h-4 text-gray-500"></i> ${currentSerie} 
-                                <span class="text-xs font-normal text-gray-500 bg-white border px-2 py-0.5 rounded ml-2">${currentColl}</span>
-                            </div>
-                        </td>
-                    </tr>`;
-                    lastSerie = currentSerie;
-                    lastFormat = null;
+                const s = safeVal(row[COLS.SERIE]);
+                if(s !== lastSerie) {
+                    html += `<tr class="group-header bg-gray-100 border-t-2 border-gray-300"><td colspan="${cols.length}" class="py-2 px-4 font-bold text-gray-800">${s} <span class="text-xs font-normal text-gray-500 ml-2">(${safeVal(row[COLS.COLECCION])})</span></td></tr>`;
+                    lastSerie = s;
                 }
-
-                // Agrupación Formato
-                if (currentFormat !== lastFormat) {
-                    html += `<tr class="bg-gray-50">
-                        <td colspan="${columns.length}" class="py-2 px-4 text-xs font-bold text-gray-500 uppercase tracking-wider pl-8 border-b border-gray-100">
-                             <i data-lucide="ruler" class="w-3 h-3 inline mr-1"></i> ${currentFormat}
-                        </td>
-                    </tr>`;
-                    lastFormat = currentFormat;
-                }
-
-                html += '<tr class="hover:bg-blue-50 transition-colors border-b border-gray-100">';
-                columns.forEach(col => {
-                    // PROTECCIÓN: Si la columna no existe en COLS, usamos un string vacío
-                    const key = COLS[col];
-                    let val = key ? safeVal(row[key]) : '';
-                    html += `<td class="py-2 px-3 whitespace-nowrap">${val}</td>`;
+                html += `<tr class="border-b border-gray-100 hover:bg-blue-50">`;
+                cols.forEach(c => {
+                    const k = COLS[c];
+                    html += `<td class="py-2 px-3 whitespace-nowrap">${k ? safeVal(row[k]) : ''}</td>`;
                 });
-                html += '</tr>';
+                html += `</tr>`;
             });
-
             html += `</tbody></table></div></div>`;
-            container.innerHTML = html;
-            container.classList.remove('hidden');
-            placeholder.classList.add('hidden');
-            if (window.lucide) lucide.createIcons();
+            cont.innerHTML = html;
+            cont.classList.remove('hidden'); place.classList.add('hidden');
+            if(window.lucide) lucide.createIcons();
         }
 
         function copyReportToClipboard() {
             try {
-                const table = document.getElementById('export-table');
-                if (!table) { alert("No hay datos para copiar."); return; }
-
+                const t = document.getElementById('export-table');
+                if(!t) { alert("Genera el informe primero."); return; }
+                
                 let tsv = "";
                 // Headers
-                const headers = Array.from(table.querySelectorAll('thead th')).map(th => th.innerText);
-                tsv += headers.join('\t') + '\n';
+                tsv += Array.from(t.querySelectorAll('thead th')).map(th => th.innerText).join('\t') + '\n';
                 
-                // Rows
-                const rows = table.querySelectorAll('tbody tr');
-                rows.forEach(tr => {
-                    // Ignoramos cabeceras de grupo para la copia limpia
-                    if (tr.querySelector('.report-group-header') || tr.querySelector('.uppercase')) return; 
-
-                    const cells = Array.from(tr.querySelectorAll('td')).map(td => {
-                        return td.innerText.replace(/(\r\n|\n|\r)/gm, " ").replace(/\t/g, " ").trim();
-                    });
-                    if(cells.length > 0) tsv += cells.join('\t') + '\n';
+                // Rows (Skip grouping headers for clean copy)
+                const trs = t.querySelectorAll('tbody tr');
+                trs.forEach(tr => {
+                    if(tr.classList.contains('group-header')) return; 
+                    const cells = Array.from(tr.querySelectorAll('td')).map(td => td.innerText.replace(/[\t\n\r]/g, " ").trim());
+                    if(cells.length) tsv += cells.join('\t') + '\n';
                 });
 
-                navigator.clipboard.writeText(tsv).then(() => {
-                    alert("✅ Tabla copiada. Pégala en Excel con Ctrl+V.");
-                }).catch(err => alert("Error al copiar: " + err));
+                navigator.clipboard.writeText(tsv).then(() => alert("✅ Copiado. Pega en Excel (Ctrl+V).")).catch(e => alert("Error copia: "+e));
             } catch(e) { console.error(e); }
         }
 
         function exportReportToCSV() {
             try {
-                const table = document.getElementById('export-table');
-                if (!table) { alert("Genera el informe primero."); return; }
+                const t = document.getElementById('export-table');
+                if(!t) { alert("Genera el informe primero."); return; }
 
                 let csv = [];
-                const headers = Array.from(table.querySelectorAll('thead th')).map(th => `"${th.innerText}"`);
-                csv.push(headers.join(';'));
-
-                const rows = table.querySelectorAll('tbody tr');
-                rows.forEach(tr => {
-                    if (tr.querySelector('.report-group-header') || tr.querySelector('.uppercase')) return;
-
-                    const cells = Array.from(tr.querySelectorAll('td')).map(td => {
-                        let val = td.innerText.replace(/"/g, '""');
-                        return `"${val}"`;
-                    });
-                    if(cells.length > 0) csv.push(cells.join(';'));
+                // Headers
+                csv.push(Array.from(t.querySelectorAll('thead th')).map(th => `"${th.innerText}"`).join(';'));
+                
+                // Rows
+                const trs = t.querySelectorAll('tbody tr');
+                trs.forEach(tr => {
+                    if(tr.classList.contains('group-header')) return;
+                    const cells = Array.from(tr.querySelectorAll('td')).map(td => `"${td.innerText.replace(/"/g, '""')}"`);
+                    if(cells.length) csv.push(cells.join(';'));
                 });
 
-                const csvContent = "\uFEFF" + csv.join('\r\n');
-                const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+                const blob = new Blob(["\uFEFF"+csv.join('\r\n')], {type:'text/csv;charset=utf-8;'});
                 const url = URL.createObjectURL(blob);
-                const link = document.createElement("a");
-                link.setAttribute("href", url);
-                link.setAttribute("download", "informe_catalogo.csv");
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
+                const a = document.createElement("a");
+                a.href = url; a.download = "informe_catalogo.csv";
+                document.body.appendChild(a); a.click(); document.body.removeChild(a);
             } catch(e) { console.error(e); }
         }
 
