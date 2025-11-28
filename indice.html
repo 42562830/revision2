@@ -1,0 +1,793 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Generador de Índices - Pamesa</title>
+
+    <!-- FUENTES CORPORATIVAS -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&family=Roboto+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+
+    <!-- LIBRERÍAS EXTERNAS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+
+    <style>
+        /* ========================================= */
+        /* SISTEMA DE DISEÑO PAMESA (Consistente)    */
+        /* ========================================= */
+        :root {
+            --color-principal: #ce1719;
+            --color-principal-hover: #b51517;
+            --color-fondo: #f8fafc;
+            --color-blanco: #ffffff;
+            --color-texto-principal: #0f172a;
+            --color-texto-secundario: #64748b;
+            --color-borde-suave: #e2e8f0;
+            --font-main: 'Montserrat', sans-serif;
+            --font-tech: 'Roboto Mono', monospace;
+        }
+
+        body {
+            font-family: var(--font-main);
+            background-color: var(--color-fondo);
+            color: var(--color-texto-principal);
+            height: 100vh;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* HEADER */
+        header {
+            background: white;
+            border-bottom: 1px solid var(--color-borde-suave);
+            padding: 0 24px;
+            height: 64px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-shrink: 0;
+            z-index: 20;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+        }
+
+        .header-brand {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-weight: 700;
+            color: #333;
+            font-size: 1.1rem;
+        }
+
+        /* LAYOUT PRINCIPAL */
+        #workspace {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+        }
+
+        /* SIDEBAR DE FILTROS */
+        #filters-panel {
+            width: 340px;
+            background: white;
+            border-right: 1px solid var(--color-borde-suave);
+            display: flex;
+            flex-direction: column;
+            overflow-y: auto;
+            flex-shrink: 0;
+            z-index: 10;
+        }
+
+        .filter-section {
+            padding: 20px;
+            border-bottom: 1px solid var(--color-borde-suave);
+        }
+
+        .filter-section h3 {
+            font-size: 0.75rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            color: var(--color-texto-secundario);
+            margin-bottom: 12px;
+            letter-spacing: 0.05em;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .input-group {
+            margin-bottom: 12px;
+        }
+
+        .input-group label {
+            display: block;
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: #475569;
+            margin-bottom: 4px;
+        }
+
+        .form-control {
+            width: 100%;
+            padding: 8px 12px;
+            border-radius: 6px;
+            border: 1px solid var(--color-borde-suave);
+            font-size: 0.85rem;
+            background-color: #f8fafc;
+            transition: all 0.2s;
+            color: #1e293b;
+        }
+
+        .form-control:focus {
+            background-color: white;
+            border-color: var(--color-principal);
+            outline: none;
+            box-shadow: 0 0 0 3px rgba(206, 23, 25, 0.1);
+        }
+
+        /* AREA DE RESULTADOS */
+        #results-area {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            background: var(--color-fondo);
+            overflow: hidden;
+            position: relative;
+        }
+
+        /* BARRA DE HERRAMIENTAS SUPERIOR */
+        #toolbar {
+            padding: 12px 24px;
+            background: white;
+            border-bottom: 1px solid var(--color-borde-suave);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .column-toggles {
+            display: flex;
+            gap: 12px;
+            overflow-x: auto;
+            padding-bottom: 4px;
+            max-width: 60%;
+        }
+
+        .col-toggle {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 0.75rem;
+            cursor: pointer;
+            white-space: nowrap;
+            user-select: none;
+        }
+
+        .col-toggle input {
+            accent-color: var(--color-principal);
+        }
+
+        /* TABLA DE RESULTADOS */
+        #table-container {
+            flex: 1;
+            overflow: auto;
+            padding: 24px;
+        }
+
+        .excel-table {
+            width: 100%;
+            border-collapse: collapse;
+            background: white;
+            font-size: 0.8rem;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+
+        .excel-table th {
+            background: #f1f5f9;
+            border: 1px solid #cbd5e1;
+            padding: 8px 12px;
+            text-align: left;
+            font-weight: 700;
+            color: #334155;
+            position: sticky;
+            top: 0;
+            z-index: 5;
+        }
+
+        .excel-table td {
+            border: 1px solid #e2e8f0;
+            padding: 6px 12px;
+            color: #334155;
+            white-space: nowrap;
+        }
+
+        .excel-table tr:nth-child(even) {
+            background-color: #f8fafc;
+        }
+
+        .excel-table tr:hover {
+            background-color: #fef2f2;
+        }
+
+        /* BOTONES */
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 16px;
+            border-radius: 6px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            border: 1px solid transparent;
+        }
+
+        .btn-primary {
+            background-color: var(--color-principal);
+            color: white;
+            box-shadow: 0 2px 4px rgba(206, 23, 25, 0.2);
+        }
+
+        .btn-primary:hover {
+            background-color: var(--color-principal-hover);
+            transform: translateY(-1px);
+        }
+
+        .btn-secondary {
+            background-color: white;
+            border-color: var(--color-borde-suave);
+            color: #475569;
+        }
+
+        .btn-secondary:hover {
+            border-color: #94a3b8;
+            background-color: #f8fafc;
+        }
+
+        .btn-green {
+            background-color: #10b981;
+            color: white;
+        }
+        .btn-green:hover { background-color: #059669; }
+
+        /* LOADING OVERLAY */
+        #loading-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(255,255,255,0.9);
+            z-index: 100;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+
+        /* SCROLLBAR */
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+        
+        /* Stats pill */
+        .count-pill {
+            background: #e2e8f0;
+            padding: 4px 10px;
+            border-radius: 99px;
+            font-size: 0.75rem;
+            font-weight: 700;
+            color: #475569;
+        }
+    </style>
+</head>
+
+<body>
+
+    <!-- OVERLAY DE CARGA -->
+    <div id="loading-overlay">
+        <div class="animate-spin rounded-full h-10 w-10 border-b-2 border-red-600 mb-4"></div>
+        <h2 class="text-xl font-bold text-gray-800">Cargando Catálogo...</h2>
+        <p class="text-gray-500 text-sm mt-2">Leyendo BD-21-11-2025.csv</p>
+    </div>
+
+    <!-- HEADER -->
+    <header>
+        <div class="header-brand">
+            <i data-lucide="database" class="text-red-600 w-6 h-6"></i>
+            <span>PAMESA | Generador de Índices</span>
+        </div>
+        <div class="flex items-center gap-4">
+            <span id="total-count" class="count-pill">0 artículos</span>
+            <button id="btn-reset" class="btn btn-secondary text-xs">
+                <i data-lucide="rotate-ccw" class="w-3 h-3"></i> Limpiar Filtros
+            </button>
+        </div>
+    </header>
+
+    <!-- WORKSPACE -->
+    <div id="workspace">
+        
+        <!-- PANEL IZQUIERDO: FILTROS -->
+        <aside id="filters-panel">
+            
+            <!-- Filtro: TEXTO LIBRE -->
+            <div class="filter-section bg-red-50/50">
+                <h3><i data-lucide="search" class="w-3 h-3"></i> Búsqueda Rápida</h3>
+                <div class="input-group">
+                    <input type="text" id="f-search" class="form-control" placeholder="Buscar por Nombre, ID, Serie...">
+                </div>
+            </div>
+
+            <!-- Filtro: ESTRUCTURAL -->
+            <div class="filter-section">
+                <h3><i data-lucide="layout-grid" class="w-3 h-3"></i> Estructura</h3>
+                <div class="input-group">
+                    <label>Colección</label>
+                    <select id="f-coleccion" class="form-control"><option value="">Todas</option></select>
+                </div>
+                <div class="input-group">
+                    <label>Serie</label>
+                    <select id="f-serie" class="form-control"><option value="">Todas</option></select>
+                </div>
+                <div class="input-group">
+                    <label>Tipología</label>
+                    <select id="f-tipologia" class="form-control"><option value="">Todas</option></select>
+                </div>
+            </div>
+
+            <!-- Filtro: PRODUCTO -->
+            <div class="filter-section">
+                <h3><i data-lucide="layers" class="w-3 h-3"></i> Producto</h3>
+                <div class="grid grid-cols-2 gap-2">
+                    <div class="input-group">
+                        <label>Medida</label>
+                        <select id="f-medida" class="form-control"><option value="">Todas</option></select>
+                    </div>
+                    <div class="input-group">
+                        <label>Espesor</label>
+                        <select id="f-espesor" class="form-control"><option value="">Todos</option></select>
+                    </div>
+                </div>
+                <div class="input-group">
+                    <label>Acabado (Pieza)</label>
+                    <select id="f-acabado" class="form-control"><option value="">Todos</option></select>
+                </div>
+                <div class="input-group">
+                    <label>Efecto</label>
+                    <select id="f-efecto" class="form-control"><option value="">Todos</option></select>
+                </div>
+                 <div class="input-group">
+                    <label>Color</label>
+                    <select id="f-color" class="form-control"><option value="">Todos</option></select>
+                </div>
+            </div>
+
+            <!-- Filtro: TÉCNICO -->
+            <div class="filter-section">
+                <h3><i data-lucide="flask-conical" class="w-3 h-3"></i> Técnico</h3>
+                <div class="grid grid-cols-2 gap-2">
+                    <div class="input-group">
+                        <label>CTE (Clase)</label>
+                        <select id="f-clase" class="form-control"><option value="">Todas</option></select>
+                    </div>
+                    <div class="input-group">
+                        <label>R (DIN 51130)</label>
+                        <select id="f-r" class="form-control"><option value="">Todas</option></select>
+                    </div>
+                    <div class="input-group">
+                        <label>DIN (51097)</label>
+                        <select id="f-letra" class="form-control"><option value="">Todas</option></select>
+                    </div>
+                    <div class="input-group">
+                        <label>PTV</label>
+                        <select id="f-ptv" class="form-control"><option value="">Todos</option></select>
+                    </div>
+                </div>
+                <div class="input-group">
+                    <label>Grupo Precio</label>
+                    <select id="f-precio" class="form-control"><option value="">Todos</option></select>
+                </div>
+            </div>
+        </aside>
+
+        <!-- PANEL DERECHO: RESULTADOS -->
+        <main id="results-area">
+            
+            <!-- TOOLBAR: Selector de columnas y Acciones -->
+            <div id="toolbar">
+                <div class="flex flex-col gap-2 w-full">
+                    <div class="flex justify-between items-center w-full">
+                        <div class="text-sm font-bold text-gray-500 uppercase tracking-wider">Columnas Visibles</div>
+                        <div class="flex gap-2">
+                            <button id="btn-copy" class="btn btn-green">
+                                <i data-lucide="copy" class="w-4 h-4"></i> Copiar para Excel
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="column-toggles custom-scrollbar" id="column-selector">
+                        <!-- JS genera checkboxes aquí -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- TABLA -->
+            <div id="table-container">
+                <table id="result-table" class="excel-table">
+                    <thead>
+                        <tr id="table-header">
+                            <!-- JS genera headers -->
+                        </tr>
+                    </thead>
+                    <tbody id="table-body">
+                        <!-- JS genera filas -->
+                    </tbody>
+                </table>
+            </div>
+
+        </main>
+    </div>
+
+    <!-- JAVASCRIPT LOGIC -->
+    <script>
+        // 1. CONFIGURACIÓN Y MAPEO DE DATOS
+        const CONFIG = {
+            csvFileName: './BD-21-11-2025.csv', 
+            encoding: 'ISO-8859-1'
+        };
+
+        // Mapeo exacto de las columnas del CSV según tu especificación
+        const FIELD_MAP = {
+            // ID Interno : { csvKey: 'Nombre_CSV', label: 'Nombre Visible', defaultVisible: boolean }
+            id: { key: 'Id._Articulo', label: 'ID', default: true },
+            coleccion: { key: 'Coleccion_web', label: 'Colección', default: true },
+            serie: { key: 'Serie_web', label: 'Serie', default: true },
+            nombre: { key: 'Nombre', label: 'Nombre Modelo', default: true },
+            medida: { key: 'Medida', label: 'Medida', default: true },
+            color: { key: 'Color_ok', label: 'Color', default: true },
+            acabado: { key: 'Acabado_pieza_web', label: 'Acabado', default: true },
+            espesor: { key: 'Espesor_mm', label: 'Espesor', default: true },
+            tipologia: { key: 'Desc._Familia_web', label: 'Tipología', default: false },
+            efecto: { key: 'Efecto_web', label: 'Efecto', default: false },
+            uso: { key: 'Tipo_de_uso', label: 'Uso', default: false },
+            variacion: { key: 'Variacion_cromatica', label: 'V-Shade', default: false },
+            grupo: { key: 'Grupo_Tarifa', label: 'Grupo Precio', default: true },
+            graficas: { key: 'Graficas', label: 'Gráficas', default: false },
+            pei: { key: 'UNE-EN_ISO_10545-7', label: 'PEI', default: false },
+            clase: { key: 'UNE_41901:2017_EX', label: 'CTE', default: false },
+            r: { key: 'Deslizamiento_DIN_51130', label: 'R', default: false },
+            din: { key: 'DIN_51097', label: 'DIN', default: false },
+            ptv: { key: 'PTV_(WET)', label: 'PTV', default: false },
+            
+            // Packing
+            pz_caja: { key: 'Pz/Caja', label: 'Pz/Cj', default: true },
+            m2_caja: { key: 'M2/Caja', label: 'M2/Cj', default: true },
+            kg_caja: { key: 'Kg/Caja', label: 'Kg/Cj', default: false },
+            cj_pal: { key: 'Cj/Pallet', label: 'Cj/Pal', default: true },
+            m2_pal: { key: 'M2/Pallet', label: 'M2/Pal', default: true },
+            kg_pal: { key: 'Kg/Pallet', label: 'Kg/Pal', default: false },
+            
+            fecha: { key: 'Fecha_de_alta', label: 'F. Alta', default: false }
+        };
+
+        // Estado de la Aplicación
+        const STATE = {
+            data: [],
+            filtered: [],
+            visibleColumns: [] // Array de IDs de FIELD_MAP
+        };
+
+        // 2. INICIALIZACIÓN
+        document.addEventListener('DOMContentLoaded', () => {
+            initColumnSelector();
+            loadCSV();
+            lucide.createIcons();
+            
+            // Event Listeners para Filtros
+            const inputs = document.querySelectorAll('.form-control');
+            inputs.forEach(input => {
+                input.addEventListener('input', debounce(applyFilters, 300));
+                input.addEventListener('change', applyFilters);
+            });
+
+            document.getElementById('btn-reset').addEventListener('click', resetFilters);
+            document.getElementById('btn-copy').addEventListener('click', copyToClipboard);
+        });
+
+        // 3. CARGA DE DATOS
+        function loadCSV() {
+            fetch(CONFIG.csvFileName)
+                .then(r => {
+                    if(!r.ok) throw new Error("No se encuentra el CSV");
+                    return r.arrayBuffer();
+                })
+                .then(buffer => {
+                    const decoder = new TextDecoder(CONFIG.encoding);
+                    const csvText = decoder.decode(buffer);
+                    Papa.parse(csvText, {
+                        header: true,
+                        delimiter: ";",
+                        skipEmptyLines: true,
+                        complete: function(results) {
+                            STATE.data = results.data;
+                            STATE.filtered = [...STATE.data]; // Copia inicial
+                            
+                            populateSelects();
+                            applyFilters(); // Render inicial
+                            
+                            document.getElementById('loading-overlay').style.display = 'none';
+                        },
+                        error: function(err) {
+                            alert("Error leyendo CSV: " + err.message);
+                        }
+                    });
+                })
+                .catch(err => {
+                    alert("Error crítico: " + err.message + "\nAsegúrate de que 'BD-21-11-2025.csv' está en la carpeta.");
+                });
+        }
+
+        // 4. GENERACIÓN DE INTERFAZ DINÁMICA
+        function initColumnSelector() {
+            const container = document.getElementById('column-selector');
+            container.innerHTML = '';
+            
+            // Recorremos el FIELD_MAP para crear checkboxes
+            Object.keys(FIELD_MAP).forEach(fieldId => {
+                const conf = FIELD_MAP[fieldId];
+                if(conf.default) STATE.visibleColumns.push(fieldId);
+                
+                const label = document.createElement('label');
+                label.className = 'col-toggle';
+                label.innerHTML = `
+                    <input type="checkbox" value="${fieldId}" ${conf.default ? 'checked' : ''}>
+                    ${conf.label}
+                `;
+                
+                // Evento al cambiar checkbox
+                label.querySelector('input').addEventListener('change', (e) => {
+                    if(e.target.checked) {
+                        STATE.visibleColumns.push(fieldId);
+                    } else {
+                        STATE.visibleColumns = STATE.visibleColumns.filter(id => id !== fieldId);
+                    }
+                    // Reordenar columnas según el orden original de FIELD_MAP
+                    const order = Object.keys(FIELD_MAP);
+                    STATE.visibleColumns.sort((a,b) => order.indexOf(a) - order.indexOf(b));
+                    
+                    renderTable();
+                });
+                
+                container.appendChild(label);
+            });
+        }
+
+        function populateSelects() {
+            // Función auxiliar para llenar un select con valores únicos
+            const fill = (selectId, csvKey) => {
+                const set = new Set();
+                STATE.data.forEach(r => {
+                    const val = r[csvKey];
+                    if(val && val.trim() !== '') set.add(val.trim());
+                });
+                
+                // Ordenar alfanuméricamente
+                const sorted = Array.from(set).sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }));
+                
+                const sel = document.getElementById(selectId);
+                const currentVal = sel.value; // Guardar valor si existe
+                sel.innerHTML = '<option value="">Todos</option>';
+                sorted.forEach(v => {
+                    sel.innerHTML += `<option value="${v}">${v}</option>`;
+                });
+                sel.value = currentVal; // Restaurar
+            };
+
+            // Mapeamos selects a columnas CSV
+            fill('f-coleccion', FIELD_MAP.coleccion.key);
+            fill('f-serie', FIELD_MAP.serie.key);
+            fill('f-tipologia', FIELD_MAP.tipologia.key);
+            fill('f-medida', FIELD_MAP.medida.key);
+            fill('f-espesor', FIELD_MAP.espesor.key);
+            fill('f-acabado', FIELD_MAP.acabado.key);
+            fill('f-efecto', FIELD_MAP.efecto.key);
+            fill('f-color', FIELD_MAP.color.key);
+            fill('f-precio', FIELD_MAP.grupo.key);
+            fill('f-clase', FIELD_MAP.clase.key);
+            fill('f-r', FIELD_MAP.r.key);
+            fill('f-letra', FIELD_MAP.din.key);
+            fill('f-ptv', FIELD_MAP.ptv.key);
+        }
+
+        // 5. LÓGICA DE FILTRADO
+        function applyFilters() {
+            // Obtener valores de los inputs
+            const sText = document.getElementById('f-search').value.toLowerCase();
+            const sCol = document.getElementById('f-coleccion').value;
+            const sSer = document.getElementById('f-serie').value;
+            const sTip = document.getElementById('f-tipologia').value;
+            const sMed = document.getElementById('f-medida').value;
+            const sEsp = document.getElementById('f-espesor').value;
+            const sAca = document.getElementById('f-acabado').value;
+            const sEfe = document.getElementById('f-efecto').value;
+            const sColr = document.getElementById('f-color').value;
+            const sPre = document.getElementById('f-precio').value;
+            const sCla = document.getElementById('f-clase').value;
+            const sR = document.getElementById('f-r').value;
+            const sDin = document.getElementById('f-letra').value;
+            const sPtv = document.getElementById('f-ptv').value;
+
+            // Filtrar array
+            STATE.filtered = STATE.data.filter(row => {
+                // 1. Texto Libre (busca en varios campos clave)
+                if (sText) {
+                    const haystack = (
+                        (row[FIELD_MAP.nombre.key]||'') + ' ' + 
+                        (row[FIELD_MAP.serie.key]||'') + ' ' + 
+                        (row[FIELD_MAP.id.key]||'')
+                    ).toLowerCase();
+                    if (!haystack.includes(sText)) return false;
+                }
+
+                // 2. Coincidencias exactas de Selects
+                if (sCol && row[FIELD_MAP.coleccion.key] !== sCol) return false;
+                if (sSer && row[FIELD_MAP.serie.key] !== sSer) return false;
+                if (sTip && row[FIELD_MAP.tipologia.key] !== sTip) return false;
+                if (sMed && row[FIELD_MAP.medida.key] !== sMed) return false;
+                if (sEsp && row[FIELD_MAP.espesor.key] !== sEsp) return false;
+                if (sAca && row[FIELD_MAP.acabado.key] !== sAca) return false;
+                if (sEfe && row[FIELD_MAP.efecto.key] !== sEfe) return false;
+                if (sColr && row[FIELD_MAP.color.key] !== sColr) return false;
+                if (sPre && row[FIELD_MAP.grupo.key] !== sPre) return false;
+                if (sCla && row[FIELD_MAP.clase.key] !== sCla) return false;
+                if (sR && row[FIELD_MAP.r.key] !== sR) return false;
+                if (sDin && row[FIELD_MAP.din.key] !== sDin) return false;
+                if (sPtv && row[FIELD_MAP.ptv.key] !== sPtv) return false;
+
+                return true;
+            });
+
+            // Actualizar conteo
+            document.getElementById('total-count').innerText = `${STATE.filtered.length} artículos`;
+
+            renderTable();
+        }
+
+        function resetFilters() {
+            // Limpiar inputs
+            document.querySelectorAll('.form-control').forEach(el => el.value = "");
+            applyFilters();
+        }
+
+        // 6. RENDERIZADO DE TABLA
+        function renderTable() {
+            const thead = document.getElementById('table-header');
+            const tbody = document.getElementById('table-body');
+            
+            // Limpiar
+            thead.innerHTML = '';
+            tbody.innerHTML = '';
+
+            // Si no hay datos
+            if (STATE.filtered.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="100" class="p-8 text-center text-gray-400">No hay resultados con estos filtros</td></tr>';
+                return;
+            }
+
+            // A. Dibujar Headers
+            STATE.visibleColumns.forEach(fieldId => {
+                const th = document.createElement('th');
+                th.innerText = FIELD_MAP[fieldId].label;
+                thead.appendChild(th);
+            });
+
+            // Optimización: Si hay más de 500 filas, avisar o limitar render visual (pero permitir exportar todo)
+            // Para la vista en pantalla, limitamos a 200 filas para que no se congele el navegador.
+            // Al copiar, copiaremos TODO.
+            const VIEW_LIMIT = 500;
+            const dataToShow = STATE.filtered.slice(0, VIEW_LIMIT);
+
+            // B. Dibujar filas
+            const fragment = document.createDocumentFragment();
+            dataToShow.forEach(row => {
+                const tr = document.createElement('tr');
+                STATE.visibleColumns.forEach(fieldId => {
+                    const td = document.createElement('td');
+                    const csvKey = FIELD_MAP[fieldId].key;
+                    td.innerText = row[csvKey] || ''; // Valor seguro
+                    tr.appendChild(td);
+                });
+                fragment.appendChild(tr);
+            });
+            tbody.appendChild(fragment);
+
+            if (STATE.filtered.length > VIEW_LIMIT) {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `<td colspan="${STATE.visibleColumns.length}" class="text-center bg-yellow-50 text-yellow-700 font-bold py-2">
+                    ⚠️ Mostrando primeras ${VIEW_LIMIT} filas de ${STATE.filtered.length}. Al copiar a Excel se copiarán TODAS.
+                </td>`;
+                tbody.appendChild(tr);
+            }
+        }
+
+        // 7. EXPORTACIÓN (COPIAR A EXCEL)
+        function copyToClipboard() {
+            if (STATE.filtered.length === 0) {
+                alert("No hay datos para copiar.");
+                return;
+            }
+
+            // 1. Crear una tabla temporal invisible con TODOS los datos (sin límite de visualización)
+            const tempTable = document.createElement('table');
+            
+            // Header
+            const thead = document.createElement('thead');
+            const trHead = document.createElement('tr');
+            STATE.visibleColumns.forEach(fid => {
+                const th = document.createElement('th');
+                th.innerText = FIELD_MAP[fid].label;
+                th.style.border = "1px solid #000"; // Borde explicito para Excel
+                th.style.background = "#EEE";
+                th.style.fontWeight = "bold";
+                trHead.appendChild(th);
+            });
+            thead.appendChild(trHead);
+            tempTable.appendChild(thead);
+
+            // Body
+            const tbody = document.createElement('tbody');
+            STATE.filtered.forEach(row => {
+                const tr = document.createElement('tr');
+                STATE.visibleColumns.forEach(fid => {
+                    const td = document.createElement('td');
+                    // Excel prefiere números con coma o punto según configuración regional.
+                    // Pasamos el texto tal cual viene del CSV.
+                    td.innerText = row[FIELD_MAP[fid].key] || '';
+                    td.style.border = "1px solid #CCC";
+                    tr.appendChild(td);
+                });
+                tbody.appendChild(tr);
+            });
+            tempTable.appendChild(tbody);
+
+            // Estilos inline básicos para que Excel los pille
+            tempTable.style.borderCollapse = 'collapse';
+
+            // 2. Añadir al DOM, seleccionar y copiar
+            document.body.appendChild(tempTable);
+            
+            const range = document.createRange();
+            range.selectNode(tempTable);
+            window.getSelection().removeAllRanges();
+            window.getSelection().addRange(range);
+
+            try {
+                document.execCommand('copy');
+                alert(`✅ ${STATE.filtered.length} filas copiadas al portapapeles.\n\nAhora abre Excel y pega (Ctrl+V).`);
+            } catch (err) {
+                alert("Error al intentar copiar automáticamente. Tu navegador no lo permite.");
+            }
+
+            // 3. Limpieza
+            window.getSelection().removeAllRanges();
+            document.body.removeChild(tempTable);
+        }
+
+        // Utilidad Debounce (para no filtrar en cada tecla pulsada)
+        function debounce(func, wait) {
+            let timeout;
+            return function(...args) {
+                const context = this;
+                clearTimeout(timeout);
+                timeout = setTimeout(() => func.apply(context, args), wait);
+            };
+        }
+    </script>
+</body>
+</html>
