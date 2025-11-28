@@ -2739,66 +2739,52 @@
 
             if (scope === 'current') {
                 if (!APP_STATE.currentSerie) {
-                    // FALLBACK INTELIGENTE: Si no hay serie seleccionada, avisar y cambiar a 'all' o mostrar error en pantalla
                     container.innerHTML = `
-                        <div class="p-8 text-center">
-                            <div class="text-orange-500 font-bold mb-2">⚠️ No hay serie seleccionada</div>
-                            <p class="text-sm text-gray-600 mb-4">Para usar "Serie Actual", primero debes seleccionar una serie en el menú lateral.</p>
-                            <button onclick="document.querySelector('input[value=all]').click(); generateReport();" class="px-4 py-2 bg-blue-600 text-white rounded text-sm font-bold">
-                                Cambiar a "Todo el Catálogo"
-                            </button>
+                        <div class="p-8 text-center text-gray-700">
+                            <p class="font-semibold mb-2">Selecciona una serie primero</p>
+                            <p class="text-sm text-gray-500">Abre una serie desde el menú lateral y vuelve a generar el informe.</p>
                         </div>
                     `;
                     container.classList.remove('hidden');
                     placeholder.classList.add('hidden');
                     return;
                 }
-                reportData = APP_STATE.hierarchy[APP_STATE.currentSerie.coll][APP_STATE.currentSerie.name];
+
+                const serieData = APP_STATE?.hierarchy?.[APP_STATE.currentSerie.coll]?.[APP_STATE.currentSerie.name];
+                reportData = Array.isArray(serieData) ? serieData : [];
                 title = `INFORME: ${APP_STATE.currentSerie.name} (${APP_STATE.currentSerie.coll})`;
             } else {
-                // TODO EL CATÁLOGO
-                // Aplicar filtros globales si existen
-                // (Si el usuario ha filtrado por fecha o técnica en el sidebar principal, ¿deberíamos respetarlo?)
-                // El usuario dijo: "necesito que liste todos los artciulos selecionado con esos valores"
-                // Asumiremos que si hay filtros activos en APP_STATE (dateFilter, techFilter), los usamos.
-
-                // Recalculamos 'filtered data' basándonos en los filtros actuales
-                // Esto es un poco redundante con buildHierarchy pero asegura consistencia
-
-                // Si queremos TODO lo que hay en memoria (filtrado o no):
-                // Usaremos una estrategia: Si hay filtros activos, usamos los datos filtrados. Si no, todo.
-
-                // Para simplificar y ser robustos: Usamos todos los datos que están actualmente en el árbol (APP_STATE.hierarchy)
-                // O mejor, iteramos APP_STATE.data y aplicamos los filtros activos manualmente para estar seguros.
-
-                // Vamos a usar APP_STATE.data pero filtrado por lo que esté activo
                 reportData = APP_STATE.data.filter(row => {
                     // Filtro Fecha
                     if (APP_STATE.dateFilter.active) {
-                        if (APP_STATE.dateFilter.mode === 'custom') {
-                            const { year, month } = APP_STATE.dateFilter;
+                        const { mode, year, month, monthsBack } = APP_STATE.dateFilter;
+
+                        if (mode === 'custom') {
                             if (!row._dateObj) return false;
                             if (year && row._dateObj.getFullYear() !== year) return false;
-                            if (month !== null && row._dateObj.getMonth() !== month) return false;
-                        } else if (APP_STATE.dateFilter.mode.startsWith('recent')) {
+                            if (month !== null && month !== undefined && row._dateObj.getMonth() !== month) return false;
+                        } else if (mode && mode.startsWith('recent')) {
                             const cutoff = new Date();
-                            cutoff.setMonth(cutoff.getMonth() - APP_STATE.dateFilter.monthsBack);
+                            const months = Number(monthsBack) || 0;
+                            cutoff.setMonth(cutoff.getMonth() - months);
                             if (!row._dateObj || row._dateObj < cutoff) return false;
                         }
                     }
+
                     // Filtro Técnica
                     if (APP_STATE.techFilter.active) {
                         const { cte, r, din, ptv } = APP_STATE.techFilter;
-                        if (cte && safeVal(row[COLS.CLASE]) !== cte) return false;
-                        if (r && safeVal(row[COLS.R]) !== r) return false;
-                        if (din && safeVal(row[COLS.LETRA]) !== din) return false;
-                        if (ptv && safeVal(row[COLS.PTV]) !== ptv) return false;
+                        if (cte && safeVal(row[COLS.CLASE]) !== safeVal(cte)) return false;
+                        if (r && safeVal(row[COLS.R]) !== safeVal(r)) return false;
+                        if (din && safeVal(row[COLS.LETRA]) !== safeVal(din)) return false;
+                        if (ptv && safeVal(row[COLS.PTV]) !== safeVal(ptv)) return false;
                     }
+
                     // Filtro Estructural
                     if (APP_STATE.structFilter && APP_STATE.structFilter.active) {
                         const { medida, tipo } = APP_STATE.structFilter;
-                        if (medida && safeVal(row[COLS.MEDIDA]) !== medida) return false;
-                        if (tipo && safeVal(row[COLS.TIPOLOGIA]) !== tipo) return false;
+                        if (medida && safeVal(row[COLS.MEDIDA]) !== safeVal(medida)) return false;
+                        if (tipo && safeVal(row[COLS.TIPOLOGIA]) !== safeVal(tipo)) return false;
                     }
                     return true;
                 });
@@ -2835,7 +2821,7 @@
                 container.innerHTML = `
                     <div class="p-8 text-center text-gray-500 bg-white rounded border border-gray-200">
                         <i data-lucide="search-x" class="w-12 h-12 mx-auto mb-2 text-gray-300"></i>
-                        <p>No se encontraron artículos con los filtros actuales.</p>
+                        <p>No hay resultados.</p>
                     </div>`;
                 container.classList.remove('hidden');
                 placeholder.classList.add('hidden');
