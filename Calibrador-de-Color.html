@@ -1,0 +1,1018 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pamesa - Calibrador de Color</title>
+    
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+
+    <style>
+        /* --- VARIABLES DE DISEÑO Y CONFIGURACIÓN GLOBAL (DESDE HUB) --- */
+        :root {
+            --pamesa-red: #CC0000;
+            --pamesa-red-dark: #A30000;
+            --pamesa-text-dark: #1a1a1a;
+            --pamesa-text-light: #5f676d;
+            --pamesa-background-light: #f8f9fa;
+            --pamesa-border-color: #e9ecef;
+            --pamesa-white: #ffffff;
+            --pamesa-success: #28a745;
+            --shadow-sm: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+            --shadow-md: 0 10px 15px -3px rgba(0, 0, 0, 0.07), 0 4px 6px -2px rgba(0, 0, 0, 0.04);
+        }
+
+        /* --- ESTILOS GLOBALES (DESDE HUB) --- */
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        html { scroll-behavior: smooth; }
+
+        body {
+            font-family: 'Montserrat', sans-serif;
+            background-color: var(--pamesa-background-light);
+            color: var(--pamesa-text-dark);
+            margin: 0;
+            line-height: 1.6;
+            overflow: hidden;
+        }
+        body.modal-open {
+            overflow: hidden;
+        }
+
+        /* --- PANTALLA DE BIENVENIDA --- */
+        #welcomeScreen {
+            position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+            z-index: 9999; display: flex; flex-direction: column;
+            justify-content: flex-end; align-items: center; padding-bottom: 10vh;
+            box-sizing: border-box; transition: opacity 0.5s ease-in-out;
+            background-color: #000;
+        }
+        #welcomeScreen h1 {
+            color: var(--pamesa-white); font-size: 2.5rem; text-align: center;
+            margin-bottom: 25px; text-shadow: 2px 2px 8px rgba(0,0,0,0.7);
+            font-weight: 700;
+        }
+        
+        /* --- ESTRUCTURA DE LA APLICACIÓN --- */
+        .app-layout { display: none; height: 100vh; flex-direction: row;}
+        .control-panel {
+            width: 450px; flex-shrink: 0; background-color: var(--pamesa-white);
+            box-shadow: var(--shadow-md);
+            display: flex; flex-direction: column; z-index: 10;
+            transition: opacity 0.3s ease-in-out;
+        }
+        .control-panel.is-processing { opacity: 0.7; pointer-events: none; }
+        .control-panel-header {
+            display: flex;
+            align-items: center;
+            padding: 15px 30px;
+            border-bottom: 1px solid var(--pamesa-border-color);
+            background-color: var(--pamesa-red);
+        }
+        .back-to-hub-link {
+            display: inline-block;
+            line-height: 0;
+            transition: opacity 0.3s ease;
+        }
+        .back-to-hub-link:hover { opacity: 0.85; }
+        .control-panel-header img { height: 40px; width: auto; filter: brightness(0) invert(1); }
+        .control-panel-body { padding: 30px; overflow-y: auto; flex-grow: 1; }
+        .results-canvas { flex-grow: 1; padding: 40px; overflow-y: auto; background-color: var(--pamesa-background-light); }
+        
+        h1, h2 { color: var(--pamesa-text-dark); margin: 0; font-weight: 700; }
+        h1 {font-size: 1.8em;}
+        h2 {font-size: 1.4em; color: var(--pamesa-text-dark); }
+        .title-container { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+        #resetBtn, #helpBtn {
+            background-color: transparent; border: none; padding: 0; cursor: pointer;
+            color: var(--pamesa-text-light); transition: color 0.2s ease-in-out;
+            display: flex; align-items: center; justify-content: center;
+        }
+        #resetBtn:hover, #helpBtn:hover { color: var(--pamesa-red); }
+        #resetBtn svg, #helpBtn svg { width: 24px; height: 24px; }
+        p.subtitle { color: var(--pamesa-text-light); line-height: 1.6; margin: 0 0 25px; }
+
+        /* --- COMPONENTES REUTILIZABLES: BOTONES (DESDE HUB) --- */
+        .btn {
+            display: inline-flex;
+            text-decoration: none;
+            font-weight: 600;
+            font-size: 0.95rem;
+            padding: 12px 28px;
+            border-radius: 50px;
+            transition: all 0.3s ease;
+            border: 2px solid transparent;
+            cursor: pointer;
+            justify-content: center;
+            align-items: center;
+            gap: 10px;
+        }
+        .btn-primary {
+            color: var(--pamesa-white);
+            background-color: var(--pamesa-red);
+            position: relative;
+            overflow: hidden;
+            width: 100%;
+        }
+        .btn-primary:hover:not(:disabled) {
+            background-color: var(--pamesa-red-dark);
+            transform: translateY(-3px);
+            box-shadow: 0 10px 20px rgba(204, 0, 0, 0.2);
+        }
+        .btn-primary::after {
+            content: ''; position: absolute; top: 0; left: -150%;
+            width: 100%; height: 100%;
+            background: linear-gradient(110deg, rgba(255, 255, 255, 0) 40%, rgba(255, 255, 255, 0.25) 50%, rgba(255, 255, 255, 0) 60%);
+            transform: skewX(-25deg);
+            transition: left 0.8s ease-in-out;
+        }
+        .btn-primary:hover::after { left: 150%; }
+
+        .btn-secondary {
+            color: var(--pamesa-text-dark);
+            background-color: transparent;
+            border-color: var(--pamesa-border-color);
+        }
+        .btn-secondary:hover:not(:disabled) {
+            background-color: var(--pamesa-background-light);
+            border-color: var(--pamesa-text-light);
+        }
+        .btn:disabled {
+            background-color: #9e9e9e;
+            cursor: not-allowed;
+            box-shadow: none; transform: none;
+            border-color: transparent;
+            color: var(--pamesa-white);
+        }
+        .btn-success {
+            background-color: var(--pamesa-success);
+            color: var(--pamesa-white);
+            width: 100%;
+        }
+        .btn-success:hover:not(:disabled) {
+            background-color: #218838;
+            transform: translateY(-3px);
+            box-shadow: 0 10px 20px rgba(40, 167, 69, 0.2);
+        }
+        .spinner { width: 20px; height: 20px; border: 2px solid rgba(255,255,255,0.3); border-top-color: #fff; border-radius: 50%; animation: spin 1s linear infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        
+        /* --- SECCIONES DE SUBIDA Y FORMULARIO --- */
+        .upload-section { margin-bottom: 25px; }
+        .upload-area { border: 2px dashed var(--pamesa-border-color); border-radius: 16px; padding: 20px; cursor: pointer; background-color: var(--pamesa-white); transition: all 0.3s; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; }
+        .upload-area:hover { border-color: var(--pamesa-red); background-color: #fffafaf5; }
+        .upload-area.drag-over { border-style: solid; border-color: var(--pamesa-red-dark); background-color: #fff5f5; }
+        .upload-area .upload-icon { width: 40px; height: 40px; color: var(--pamesa-red); margin-bottom: 15px; }
+        .upload-area .upload-text-main { font-weight: 600; font-size: 1.1em; color: var(--pamesa-text-dark); margin: 0 0 5px 0; }
+        .upload-area .upload-text-secondary { color: var(--pamesa-text-light); margin: 0; font-size: 0.9em; }
+        .upload-area .upload-text-secondary strong { color: var(--pamesa-red); font-weight: 600; }
+        .upload-area input[type="file"] { display: none; }
+
+        .preview-container { margin-top: 15px; display: flex; flex-wrap: wrap; gap: 10px; }
+        .preview-item { position: relative; border: 2px solid var(--pamesa-border-color); border-radius: 8px; padding: 4px; background-color: white; width: 90px; height: 90px; text-align: center; box-shadow: var(--shadow-sm); }
+        .preview-item.reference-preview { border-color: var(--pamesa-red); border-width: 3px; }
+        .preview-item img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            display: block;
+            border-radius: 4px;
+        }
+        .remove-btn { position: absolute; top: -10px; right: -10px; background-color: var(--pamesa-red); color: white; border-radius: 50%; width: 22px; height: 22px; display: flex; align-items: center; justify-content: center; font-weight: bold; cursor: pointer; border: 2px solid white; box-shadow: 0 1px 3px rgba(0,0,0,0.2); font-size: 14px; line-height: 1; }
+        
+        .control-group { margin-top: 25px; }
+        .control-group label { display: block; font-weight: 600; margin-bottom: 8px; font-size: 0.95em; color: var(--pamesa-text-dark); }
+        .control-group input[type="text"] { width: 100%; padding: 12px; border: 1px solid var(--pamesa-border-color); border-radius: 8px; box-sizing: border-box; transition: border-color 0.2s, box-shadow 0.2s; font-family: 'Montserrat', sans-serif; font-size: 1em; }
+        .control-group input[type="text"]:focus { border-color: var(--pamesa-red); box-shadow: 0 0 0 3px rgba(204, 0, 0, 0.15); outline: none; }
+        
+        .actions-bar { margin-top: 30px; }
+        #globalDownloadContainer { margin-top: 20px; }
+
+        /* --- ZONA DE RESULTADOS --- */
+        #progress-container { display: none; margin-top: 20px; }
+        #progress-text { text-align: center; font-weight: 500; color: var(--pamesa-text-light); margin-bottom: 8px; }
+        .progress-bar-outer { width: 100%; background-color: var(--pamesa-border-color); border-radius: 10px; height: 12px; overflow: hidden; }
+        #progress-bar { width: 0%; height: 100%; background-color: var(--pamesa-red); border-radius: 10px; transition: width 0.3s ease-in-out; }
+
+        #resultsInitialState { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; text-align: center; color: #ccc; transition: opacity 0.3s ease-out; }
+        #resultsInitialState svg { width: 100px; height: 100px; margin-bottom: 20px; }
+        #resultsInitialState h2 { margin: 0; font-size: 1.5em; color: #ccc; }
+        #resultsContainer { display: grid; grid-template-columns: repeat(auto-fill, minmax(350px, 1fr)); gap: 30px; }
+
+        .result-card { 
+            background: var(--pamesa-white); 
+            border: 1px solid var(--pamesa-border-color);
+            border-radius: 16px; 
+            padding: 20px; 
+            box-shadow: var(--shadow-sm); 
+            opacity: 0; 
+            transform: translateY(20px); 
+            transition: transform 0.4s ease-out, box-shadow 0.4s ease-out, opacity 0.4s ease-out; 
+        }
+        .result-card:hover {
+            transform: translateY(-8px);
+            box-shadow: var(--shadow-md);
+        }
+        .result-card.visible { opacity: 1; transform: translateY(0); }
+        .result-card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
+        .result-card h3 { font-size: 1em; text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex-grow: 1; }
+        
+        .comparator {
+            position: relative;
+            width: 100%;
+            overflow: hidden;
+            border-radius: 8px;
+            box-shadow: var(--shadow-sm);
+            cursor: pointer;
+            background-color: #e2e8f0;
+            touch-action: none;
+        }
+        .comparator.interactive-mode { cursor: ew-resize; }
+        .comparator img { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; user-select: none; pointer-events: none; transition: filter 0.1s ease-out; }
+        .comparator .original-image { z-index: 10; clip-path: inset(0 50% 0 0); will-change: clip-path; }
+        .comparator .slider { position: absolute; top: 0; left: 50%; width: 4px; height: 100%; background-color: rgba(255, 255, 255, 0.8); transform: translateX(-50%); z-index: 20; pointer-events: none; }
+        .comparator .slider-handle { position: absolute; top: 50%; left: 50%; width: 40px; height: 40px; border-radius: 50%; background-color: white; border: 2px solid rgba(0, 0, 0, 0.2); transform: translate(-50%, -50%); display: flex; align-items: center; justify-content: center; box-shadow: var(--shadow-sm); }
+        .comparator .slider-handle svg { width: 24px; height: 24px; color: var(--pamesa-text-dark); }
+        .status-placeholder { height: 300px; display: flex; align-items: center; justify-content: center; border: 2px dashed var(--pamesa-border-color); border-radius: 8px; }
+        .status-placeholder .spinner { border-color: rgba(0,0,0,0.1); border-top-color: var(--pamesa-red); }
+
+        /* ▼▼▼ MODIFICACIÓN 2: ESTILOS PARA RESALTADO DE ETIQUETAS ▼▼▼ */
+        .comparator-label {
+            position: absolute;
+            top: 10px;
+            background-color: rgba(26, 26, 26, 0.7);
+            color: white;
+            padding: 4px 10px;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            pointer-events: none;
+            z-index: 15;
+            backdrop-filter: blur(2px);
+            opacity: 0.8; /* Estado por defecto ligeramente transparente */
+            transition: opacity 0.2s ease, background-color 0.2s ease;
+        }
+        .comparator-label.is-active {
+            opacity: 1; /* Estado activo totalmente opaco */
+            background-color: var(--pamesa-red);
+        }
+        .comparator-label.original { left: 10px; }
+        .comparator-label.calibrated { right: 10px; }
+        /* ▲▲▲ FIN DE MODIFICACIÓN 2 ▲▲▲ */
+
+        .adjust-btn { background: transparent; border: none; cursor: pointer; padding: 4px; color: var(--pamesa-text-light); }
+        .adjust-btn:hover { color: var(--pamesa-red); }
+        .adjust-btn svg { width: 20px; height: 20px; display: block; }
+        .adjustment-panel { max-height: 0; overflow: hidden; transition: max-height 0.4s ease-out, margin-top 0.4s ease-out; background-color: var(--pamesa-background-light); padding: 0 15px; margin: 0 -15px; border-radius: 8px; }
+        .result-card.is-adjusting .adjustment-panel { max-height: 300px; margin-top: 20px; padding: 15px; border: 1px solid var(--pamesa-border-color); }
+        .slider-group { margin-bottom: 12px; }
+        .slider-group label { display: flex; justify-content: space-between; align-items: center; font-weight: 600; font-size: 0.8em; margin-bottom: 8px; }
+        .slider-group label .value-display { font-weight: 500; color: var(--pamesa-text-light); background-color: var(--pamesa-border-color); padding: 1px 6px; border-radius: 4px; font-size: 0.9em; }
+        input[type="range"] { width: 100%; -webkit-appearance: none; appearance: none; background: transparent; cursor: pointer; }
+        input[type="range"]::-webkit-slider-runnable-track { height: 4px; background: var(--pamesa-border-color); border-radius: 2px; }
+        input[type="range"]::-moz-range-track { height: 4px; background: var(--pamesa-border-color); border-radius: 2px; }
+        input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; margin-top: -6px; width: 16px; height: 16px; border-radius: 50%; background-color: var(--pamesa-red); }
+        input[type="range"]::-moz-range-thumb { width: 16px; height: 16px; border-radius: 50%; background-color: var(--pamesa-red); border: none; }
+        .adjustment-actions { display: flex; gap: 10px; margin-top: 15px; }
+        .adjustment-actions .btn { width: 100%; font-size: 11px; padding: 8px 10px; border-radius: 8px; text-transform: none; }
+
+        /* --- ESTILOS DE MODALES --- */
+        .modal {
+            display: none; position: fixed; z-index: 1000; inset: 0;
+            align-items: center; justify-content: center;
+            background-color: rgba(0, 0, 0, 0.85);
+            backdrop-filter: blur(5px); padding: 20px;
+        }
+        #modalContent {
+            width: 100%;
+            height: 100%;
+            max-width: 90vw;
+            max-height: 90vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        #modalContent .comparator {
+             max-width: 100%;
+             max-height: 100%;
+             /* ▼▼▼ NUEVA MODIFICACIÓN ▼▼▼ */
+             background-color: transparent; /* Hace que el fondo sea el del modal */
+             box-shadow: none; /* Elimina la sombra innecesaria */
+             border-radius: 0; /* Elimina el redondeo innecesario */
+        }
+        /* ▲▲▲ FIN DE NUEVA MODIFICACIÓN ▲▲▲ */
+        /* ▼▼▼ MODIFICACIÓN 1: AJUSTE DE IMAGEN DENTRO DEL MODAL PARA EVITAR RECORTES ▼▼▼ */
+        #modalContent .comparator img {
+            object-fit: contain; /* Asegura que la imagen completa sea visible */
+        }
+        /* ▲▲▲ FIN DE MODIFICACIÓN 1 ▲▲▲ */
+        #closeModalBtn {
+            position: absolute; top: 20px; right: 20px; width: 40px; height: 40px;
+            background-color: rgba(255, 255, 255, 0.2); color: white; border: none;
+            border-radius: 50%; font-size: 24px; cursor: pointer;
+            display: flex; align-items: center; justify-content: center;
+            transition: background-color 0.2s; z-index: 1050;
+        }
+        #closeModalBtn:hover { background-color: rgba(255, 255, 255, 0.4); }
+        #helpModal .modal-content {
+            background-color: var(--pamesa-white); color: var(--pamesa-text-dark); padding: 30px 40px;
+            border-radius: 16px; max-width: 850px; width: 90%; max-height: 90vh;
+            overflow-y: auto; text-align: left; position: relative; box-sizing: border-box;
+            box-shadow: var(--shadow-md);
+        }
+        #helpModal .modal-close {
+            color: var(--pamesa-text-light); top: 15px; right: 20px; font-size: 35px;
+            position: absolute; cursor: pointer;
+        }
+        #helpModal h2 { font-size: 1.6em; color: var(--pamesa-red); margin-top: 0; margin-bottom: 20px; }
+        #helpModal p, #helpModal li { line-height: 1.7; color: var(--pamesa-text-light); }
+        #helpModal ol { padding-left: 25px; }
+        #helpModal li { margin-bottom: 15px; }
+        #helpModal strong { color: var(--pamesa-text-dark); font-weight: 600; }
+        #helpModal .modal-footer { text-align: right; margin-top: 30px; }
+
+        /* ### INICIO DE ESTILOS PARA NOTIFICACIÓN ### */
+        .notification-toast {
+            position: fixed;
+            bottom: 30px;
+            left: 50%;
+            transform: translate(-50%, 150%);
+            background-color: var(--pamesa-success);
+            color: var(--pamesa-white);
+            padding: 15px 25px;
+            border-radius: 50px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+            z-index: 10001;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            font-weight: 600;
+            opacity: 0;
+            visibility: hidden;
+            transition: transform 0.4s cubic-bezier(0.215, 0.610, 0.355, 1), opacity 0.4s ease, visibility 0.4s;
+        }
+        .notification-toast.show {
+            transform: translate(-50%, 0);
+            opacity: 1;
+            visibility: visible;
+        }
+        .notification-toast svg {
+            width: 24px;
+            height: 24px;
+        }
+        /* ### FIN DE ESTILOS PARA NOTIFICACIÓN ### */
+
+    </style>
+</head>
+<body>
+
+    <div id="welcomeScreen">
+        <h1>Pamesa Color Calibrator</h1>
+        <button id="enterAppBtn" class="btn btn-primary" style="width: auto;">Iniciar Herramienta</button>
+    </div>
+
+    <div class="app-layout">
+        <aside class="control-panel" id="controlPanel">
+            <header class="control-panel-header">
+                <a href="Productivity Hub.html" class="back-to-hub-link" title="Volver al Hub de Productividad">
+                    <img src="logo-pamesa_blanco.svg" alt="Pamesa Cerámica Logo">
+                </a>
+            </header>
+            <div class="control-panel-body">
+                <div class="title-container">
+                    <h1>Calibrador de Color</h1>
+                    <button id="helpBtn" title="Ayuda"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m11.25 11.25.041-.02a.75.75 0 0 1 1.063.852l-.708 2.836a.75.75 0 0 0 1.063.853l.041-.021M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9-3.75h.008v.008H12V8.25Z" /></svg></button>
+                    <button id="resetBtn" title="Nuevo Calibrado"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.134-2.036-2.134H8.718c-1.126 0-2.037.955-2.037 2.134v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" /></svg></button>
+                </div>
+                <p class="subtitle">Ajusta el color de múltiples gráficas basándote en una imagen de referencia.</p>
+                <div class="upload-section">
+                    <h2>1. Referencia (Color Correcto)</h2>
+                    <div class="upload-area" id="reference-upload-area">
+                        <input type="file" id="reference-uploader" accept="image/*">
+                        <svg class="upload-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 10.5v6m3-3H9m4.06-7.19l-2.12-2.12a1.5 1.5 0 00-1.061-.44H4.5A2.25 2.25 0 002.25 6v12a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9a2.25 2.25 0 00-2.25-2.25h-5.379a1.5 1.5 0 01-1.06-.44z" /></svg>
+                        <p class="upload-text-main">Arrastra la imagen de referencia</p>
+                        <p class="upload-text-secondary">o <strong>haz clic para seleccionar</strong></p>
+                    </div>
+                    <div class="preview-container" id="referencePreviewContainer"></div>
+                </div>
+                <div class="upload-section">
+                    <h2>2. Gráficas a Corregir</h2>
+                    <div class="upload-area" id="source-upload-area">
+                        <input type="file" id="source-uploader" accept="image/*" multiple>
+                         <svg class="upload-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909m-18 3.75h16.5a1.5 1.5 0 001.5-1.5V6a1.5 1.5 0 00-1.5-1.5H3.75A1.5 1.5 0 002.25 6v12a1.5 1.5 0 001.5 1.5z" /></svg>
+                        <p class="upload-text-main">Arrastra las gráficas a corregir</p>
+                        <p class="upload-text-secondary">Puedes seleccionar varias a la vez</p>
+                    </div>
+                    <div class="preview-container" id="sourcePreviewContainer"></div>
+                </div>
+
+                <div class="control-group">
+                    <label for="baseNameInput">Nombre Base para el Archivo ZIP:</label>
+                    <input type="text" id="baseNameInput" placeholder="Ej: Proyecto_Ceramica_Rojo">
+                </div>
+
+                <div class="actions-bar">
+                    <button id="calibrateBtn" class="btn btn-primary" disabled>Calibrar Colores</button>
+                    <div id="progress-container">
+                        <p id="progress-text">Procesando...</p>
+                        <div class="progress-bar-outer"><div id="progress-bar"></div></div>
+                    </div>
+                    <div id="globalDownloadContainer"></div>
+                </div>
+            </div>
+        </aside>
+        <main class="results-canvas">
+            <div id="resultsInitialState">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 3.75v4.5m0-4.5h4.5m-4.5 0L9 9M3.75 20.25v-4.5m0 4.5h4.5m-4.5 0L9 15M20.25 3.75h-4.5m4.5 0v4.5m0-4.5L15 9m5.25 11.25h-4.5m4.5 0v-4.5m0 4.5L15 15" /></svg>
+                <h2>Los resultados calibrados aparecerán aquí</h2>
+            </div>
+            <div id="resultsContainer"></div>
+        </main>
+    </div>
+
+    <div id="comparatorModal" class="modal">
+        <div id="modalContent"></div>
+        <button id="closeModalBtn" title="Cerrar">&times;</button>
+    </div>
+
+    <div id="helpModal" class="modal">
+        <div class="modal-content">
+            <span class="modal-close">&times;</span>
+            <h2>¿Cómo funciona el Calibrador de Color?</h2>
+            <p>Esta herramienta transfiere el color de una imagen de referencia a una o varias imágenes de origen, y te permite refinar el resultado manualmente.</p>
+            <ol>
+                <li><strong>Sube tu Imagen de Referencia</strong><p>En la primera caja, sube la imagen que tiene el <strong>color correcto</strong>.</p></li>
+                <li><strong>Sube las Gráficas a Corregir</strong><p>En la segunda caja, sube todas las imágenes que necesites ajustar. Puedes introducir un <strong>Nombre Base</strong> para organizar tu descarga.</p></li>
+                <li><strong>Calibra y Obtén los Resultados</strong><p>Haz clic en <strong>"Calibrar Colores"</strong>. A la derecha aparecerán los resultados automáticos.</p></li>
+                <li><strong>(Opcional) Ajusta Manualmente</strong><p>En cada resultado, haz clic en el icono de la rueda (⚙️) para abrir los controles. Ajusta el <strong>Brillo, Contraste y Saturación</strong>. Si te gusta el resultado, puedes usar el botón <strong>"Aplicar al resto"</strong> para propagar ese ajuste a todas las demás imágenes.</p></li>
+                <li><strong>Descarga</strong><p>El botón verde descargará un archivo <strong>.zip</strong> con todas las imágenes corregidas, incluyendo tus ajustes manuales.</p></li>
+            </ol>
+            <div class="modal-footer">
+                <button id="closeHelpModalBtn" class="btn btn-secondary" style="width: auto;">Entendido</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ### INICIO DE ELEMENTO PARA NOTIFICACIÓN ### -->
+    <div id="notificationToast" class="notification-toast">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+        <span id="notificationMessage"></span>
+    </div>
+    <!-- ### FIN DE ELEMENTO PARA NOTIFICACIÓN ### -->
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+
+    const DOM = {
+        controlPanel: document.getElementById('controlPanel'),
+        calibrateBtn: document.getElementById('calibrateBtn'),
+        resetBtn: document.getElementById('resetBtn'),
+        helpBtn: document.getElementById('helpBtn'),
+        referenceUploader: document.getElementById('reference-uploader'),
+        referenceUploadArea: document.getElementById('reference-upload-area'),
+        referencePreviewContainer: document.getElementById('referencePreviewContainer'),
+        sourceUploader: document.getElementById('source-uploader'),
+        sourceUploadArea: document.getElementById('source-upload-area'),
+        sourcePreviewContainer: document.getElementById('sourcePreviewContainer'),
+        baseNameInput: document.getElementById('baseNameInput'),
+        resultsContainer: document.getElementById('resultsContainer'),
+        resultsInitialState: document.getElementById('resultsInitialState'),
+        globalDownloadContainer: document.getElementById('globalDownloadContainer'),
+        progressContainer: document.getElementById('progress-container'),
+        progressBar: document.getElementById('progress-bar'),
+        progressText: document.getElementById('progress-text'),
+        comparatorModal: document.getElementById('comparatorModal'),
+        modalContent: document.getElementById('modalContent'),
+        closeModalBtn: document.getElementById('closeModalBtn'),
+        helpModal: document.getElementById('helpModal'),
+        closeHelpModalBtn: document.getElementById('closeHelpModalBtn'),
+        enterBtn: document.getElementById('enterAppBtn'),
+        welcomeScreen: document.getElementById('welcomeScreen'),
+        appLayout: document.querySelector('.app-layout'),
+        notificationToast: document.getElementById('notificationToast'),
+        notificationMessage: document.getElementById('notificationMessage'),
+    };
+    
+    let referenceFile = null;
+    const sourceFileStore = new Map();
+    let resultState = [];
+    let generatedObjectUrls = [];
+
+    const defaultAdjustments = () => ({ brightness: 100, contrast: 100, saturation: 100 });
+
+    function activarPantallaCompleta(element) {
+        if (element.requestFullscreen) {
+            element.requestFullscreen();
+        } else if (element.webkitRequestFullscreen) {
+            element.webkitRequestFullscreen();
+        } else if (element.mozRequestFullScreen) {
+            element.mozRequestFullScreen();
+        } else if (element.msRequestFullscreen) {
+            element.msRequestFullscreen();
+        }
+    }
+
+    let notificationTimeout;
+    function showNotification(message) {
+        clearTimeout(notificationTimeout);
+        DOM.notificationMessage.textContent = message;
+        DOM.notificationToast.classList.add('show');
+        notificationTimeout = setTimeout(() => {
+            DOM.notificationToast.classList.remove('show');
+        }, 4000);
+    }
+
+    DOM.enterBtn.addEventListener('click', () => {
+        activarPantallaCompleta(document.documentElement); 
+        DOM.welcomeScreen.style.opacity = '0';
+        setTimeout(() => {
+            DOM.welcomeScreen.style.display = 'none';
+            DOM.appLayout.style.display = 'flex';
+            document.body.style.overflow = 'auto';
+        }, 500);
+    });
+
+    const setupUploadArea = (area, uploader, handler) => {
+        area.addEventListener('click', () => uploader.click());
+        area.addEventListener('dragover', e => { e.preventDefault(); area.classList.add('drag-over'); });
+        area.addEventListener('dragleave', () => area.classList.remove('drag-over'));
+        area.addEventListener('drop', e => {
+            e.preventDefault(); area.classList.remove('drag-over');
+            if (e.dataTransfer.files.length) handler(e.dataTransfer.files);
+        });
+        uploader.addEventListener('change', e => {
+            if (e.target.files.length) handler(e.target.files); e.target.value = '';
+        });
+    };
+    setupUploadArea(DOM.referenceUploadArea, DOM.referenceUploader, handleReferenceFile);
+    setupUploadArea(DOM.sourceUploadArea, DOM.sourceUploader, handleSourceFiles);
+    
+    function handleReferenceFile(files) {
+        referenceFile = files[0];
+        DOM.referencePreviewContainer.innerHTML = '';
+        createPreview(referenceFile, DOM.referencePreviewContainer, true);
+        checkReadyState();
+    }
+    
+    function handleSourceFiles(files) {
+        let firstFileName = files.length > 0 ? files[0].name : null;
+        let commonPrefix = firstFileName ? extractBaseNameFromFile(firstFileName) : '';
+
+        for (const file of files) {
+            const fileId = `${file.name}-${file.lastModified}`;
+            if (!sourceFileStore.has(fileId)) {
+                sourceFileStore.set(fileId, file);
+                createPreview(file, DOM.sourcePreviewContainer, false);
+                if (commonPrefix) {
+                    let tempPrefix = '';
+                    const currentName = extractBaseNameFromFile(file.name);
+                    for (let i = 0; i < commonPrefix.length && i < currentName.length; i++) {
+                        if (commonPrefix[i] === currentName[i]) tempPrefix += commonPrefix[i];
+                        else break;
+                    }
+                    commonPrefix = tempPrefix;
+                }
+            }
+        }
+        
+        if (DOM.baseNameInput.value.trim() === '' && commonPrefix.length > 2) {
+            DOM.baseNameInput.value = commonPrefix.replace(/[_-]$/, '');
+        }
+        checkReadyState();
+    }
+
+    function createPreview(file, container, isReference) {
+        const fileId = `${file.name}-${file.lastModified}`;
+        const previewItem = document.createElement('div');
+        previewItem.className = 'preview-item';
+        previewItem.dataset.id = fileId;
+        if (isReference) previewItem.classList.add('reference-preview');
+        
+        const reader = new FileReader();
+        reader.onload = e => {
+            previewItem.innerHTML = `<img src="${e.target.result}" alt="${file.name}">${!isReference ? '<div class="remove-btn">&times;</div>' : ''}`;
+            container.appendChild(previewItem);
+            if (!isReference) {
+                previewItem.querySelector('.remove-btn').addEventListener('click', () => {
+                    sourceFileStore.delete(fileId);
+                    previewItem.remove();
+                    checkReadyState();
+                });
+            }
+        };
+        reader.readAsDataURL(file);
+    }
+    
+    function checkReadyState() {
+        DOM.calibrateBtn.disabled = !(referenceFile && sourceFileStore.size > 0);
+    }
+    
+    DOM.resetBtn.addEventListener('click', resetApplication);
+
+    function clearResults() {
+        DOM.resultsContainer.innerHTML = '';
+        DOM.globalDownloadContainer.innerHTML = '';
+        DOM.progressContainer.style.display = 'none';
+        resultState = [];
+        generatedObjectUrls.forEach(url => URL.revokeObjectURL(url));
+        generatedObjectUrls = [];
+        DOM.resultsInitialState.style.display = 'flex';
+    }
+
+    function resetApplication() {
+        clearResults();
+        referenceFile = null;
+        sourceFileStore.clear();
+        DOM.referencePreviewContainer.innerHTML = '';
+        DOM.sourcePreviewContainer.innerHTML = '';
+        DOM.baseNameInput.value = '';
+        DOM.controlPanel.classList.remove('is-processing');
+        DOM.calibrateBtn.innerHTML = 'Calibrar Colores';
+        checkReadyState();
+    }
+
+    DOM.calibrateBtn.addEventListener('click', async () => {
+        if (!referenceFile || sourceFileStore.size === 0) return;
+        
+        clearResults();
+        
+        DOM.controlPanel.classList.add('is-processing');
+        DOM.calibrateBtn.innerHTML = '<span class="spinner"></span> Procesando...';
+        DOM.calibrateBtn.disabled = true;
+        DOM.resultsInitialState.style.display = 'none';
+        DOM.progressContainer.style.display = 'block';
+        DOM.progressBar.style.width = '0%';
+
+        try {
+            const refData = await fileToImageData(referenceFile);
+            const refImageData = refData.imageData;
+            const refLabData = convertToLab(refImageData);
+            const refStats = calculateStats(refLabData);
+            
+            const sourceFiles = Array.from(sourceFileStore.values());
+            sourceFiles.forEach((file, index) => {
+                const fileId = `${file.name}-${file.lastModified}`;
+                const cardId = `result-card-${index}`;
+                DOM.resultsContainer.insertAdjacentHTML('beforeend', `<div class="result-card" id="${cardId}" data-file-id="${fileId}"><div class="status-placeholder"><div class="spinner"></div></div></div>`);
+            });
+
+            for (let i = 0; i < sourceFiles.length; i++) {
+                const file = sourceFiles[i];
+                const fileId = `${file.name}-${file.lastModified}`;
+                const cardElement = document.getElementById(`result-card-${i}`);
+                
+                DOM.progressText.textContent = `Procesando ${i + 1} de ${sourceFiles.length}...`;
+                
+                const sourceData = await fileToImageData(file);
+                const sourceImageData = sourceData.imageData;
+                const resultImageData = transferColor(sourceImageData, refStats);
+
+                const resultCanvas = document.createElement('canvas');
+                resultCanvas.width = resultImageData.width;
+                resultCanvas.height = resultImageData.height;
+                resultCanvas.getContext('2d').putImageData(resultImageData, 0, 0);
+                const blob = await new Promise(resolve => resultCanvas.toBlob(resolve, 'image/jpeg', 0.95));
+                
+                resultState.push({
+                    fileId: fileId,
+                    sourceFile: file,
+                    initialCorrectedBlob: blob,
+                    adjustments: defaultAdjustments(),
+                    cardElement: cardElement,
+                    aspectRatio: sourceData.width / sourceData.height
+                });
+                
+                renderResultInCard(cardElement, file, blob, sourceData.width / sourceData.height);
+                cardElement.classList.add('visible');
+                DOM.progressBar.style.width = `${((i + 1) / sourceFiles.length) * 100}%`;
+            }
+            
+            DOM.progressText.textContent = `¡Completado!`;
+
+            if (resultState.length > 0) {
+                const downloadBtn = document.createElement('button');
+                downloadBtn.className = 'btn btn-success';
+                downloadBtn.innerHTML = `Descargar ${resultState.length} Imágenes (.zip)`;
+                downloadBtn.addEventListener('click', (e) => downloadAllAsZip(e.currentTarget));
+                DOM.globalDownloadContainer.appendChild(downloadBtn);
+            }
+
+        } catch (error) {
+            console.error('Calibration failed:', error);
+            alert('Ocurrió un error durante el proceso de calibración.');
+            DOM.progressText.textContent = 'Error en el proceso';
+        } finally {
+            DOM.controlPanel.classList.remove('is-processing');
+            DOM.calibrateBtn.innerHTML = 'Calibrar de Nuevo';
+            DOM.calibrateBtn.disabled = false;
+        }
+    });
+    
+    async function fileToImageData(file) {
+        const img = new Image();
+        const url = URL.createObjectURL(file);
+        generatedObjectUrls.push(url);
+        img.src = url;
+        await new Promise((resolve, reject) => { img.onload = resolve; img.onerror = reject; });
+        const canvas = document.createElement('canvas');
+        canvas.width = img.width; canvas.height = img.height;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0);
+        return {
+            imageData: ctx.getImageData(0, 0, img.width, img.height),
+            width: img.width,
+            height: img.height
+        };
+    }
+    
+    function renderResultInCard(cardElement, originalFile, correctedBlob, aspectRatio) {
+        const originalUrl = URL.createObjectURL(originalFile);
+        const correctedUrl = URL.createObjectURL(correctedBlob);
+        generatedObjectUrls.push(originalUrl, correctedUrl);
+
+        cardElement.innerHTML = `
+            <div class="result-card-header">
+                <h3>${originalFile.name}</h3>
+                <button class="adjust-btn" title="Ajustar Color Manualmente">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.324.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 011.37.49l1.296 2.247a1.125 1.125 0 01-.26 1.431l-1.003.827c-.293.24-.438.613-.438.995s.145.755.438.995l1.003.827c.48.398.668 1.03.26 1.431l-1.296 2.247a1.125 1.125 0 01-1.37.49l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.57 6.57 0 01-.22.128c-.333.183-.582.495-.645.87l-.213 1.28c-.09.543-.56.941-1.11.941h-2.594c-.55 0-1.02-.398-1.11-.94l-.213-1.281c-.063-.374-.313-.686-.645-.87a6.52 6.52 0 01-.22-.127c-.324-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 01-1.37-.49l-1.296-2.247a1.125 1.125 0 01.26-1.431l1.004-.827c.292-.24.437-.613.437-.995s-.145-.755-.437-.995l-1.004-.827a1.125 1.125 0 01-.26-1.431l1.296-2.247a1.125 1.125 0 011.37-.49l1.217.456c.355.133.75.072 1.076-.124.072-.044.146-.087.22-.128.332-.183.582-.495.645-.87l.213-1.281z" /><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                </button>
+            </div>
+            <div class="comparator" data-original-url="${originalUrl}" data-corrected-url="${correctedUrl}" style="aspect-ratio: ${aspectRatio};">
+                <span class="comparator-label calibrated">Calibrada</span>
+                <span class="comparator-label original">Original</span>
+                <img src="${correctedUrl}" alt="Imagen Corregida" class="corrected-image">
+                <img src="${originalUrl}" alt="Imagen Original" class="original-image">
+            </div>
+            <div class="adjustment-panel">
+                <div class="slider-group"><label>Brillo <span class="value-display">100%</span></label><input type="range" class="brightness-slider" min="50" max="150" value="100"></div>
+                <div class="slider-group"><label>Contraste <span class="value-display">100%</span></label><input type="range" class="contrast-slider" min="50" max="150" value="100"></div>
+                <div class="slider-group"><label>Saturación <span class="value-display">100%</span></label><input type="range" class="saturation-slider" min="0" max="200" value="100"></div>
+                <div class="adjustment-actions">
+                    <button class="btn btn-secondary apply-to-all-btn">Aplicar al resto</button>
+                    <button class="btn btn-secondary reset-adjustments-btn" style="background-color: #a9a9a9; border-color: #a9a9a9; color: white;">Restablecer</button>
+                </div>
+            </div>`;
+    }
+
+    DOM.resultsContainer.addEventListener('input', e => {
+        if (!e.target.matches('input[type="range"]')) return;
+        const card = e.target.closest('.result-card');
+        const resultItem = resultState.find(item => item.fileId === card.dataset.fileId);
+        if (!resultItem) return;
+
+        const valueDisplay = e.target.previousElementSibling.querySelector('.value-display');
+        valueDisplay.textContent = `${e.target.value}%`;
+
+        if (e.target.classList.contains('brightness-slider')) resultItem.adjustments.brightness = e.target.value;
+        if (e.target.classList.contains('contrast-slider')) resultItem.adjustments.contrast = e.target.value;
+        if (e.target.classList.contains('saturation-slider')) resultItem.adjustments.saturation = e.target.value;
+
+        updateCardFilter(resultItem);
+    });
+
+    DOM.resultsContainer.addEventListener('click', e => {
+        const target = e.target.closest('button, .comparator');
+        if (!target) return;
+        const card = target.closest('.result-card');
+        if (!card) return;
+        const resultItem = resultState.find(item => item.fileId === card.dataset.fileId);
+        if (!resultItem) return;
+
+        if (target.matches('.adjust-btn')) {
+            card.classList.toggle('is-adjusting');
+        } 
+        else if (target.matches('.apply-to-all-btn')) {
+            const currentAdjustments = { ...resultItem.adjustments };
+            resultState.forEach(item => {
+                if (item.fileId !== resultItem.fileId) {
+                    item.adjustments = { ...currentAdjustments };
+                    updateCardControls(item);
+                    updateCardFilter(item);
+                }
+            });
+            showNotification('Ajustes aplicados a todas las imágenes.');
+        }
+        else if (target.matches('.reset-adjustments-btn')) {
+            resultItem.adjustments = defaultAdjustments();
+            updateCardControls(resultItem);
+            updateCardFilter(resultItem);
+        }
+        else if (target.matches('.comparator')) {
+            openModal(target.dataset.originalUrl, target.dataset.correctedUrl, resultItem);
+        }
+    });
+
+    function updateCardFilter(resultItem) {
+        const { brightness, contrast, saturation } = resultItem.adjustments;
+        const correctedImg = resultItem.cardElement.querySelector('.corrected-image');
+        correctedImg.style.filter = `brightness(${brightness}%) contrast(${contrast}%) saturate(${saturation}%)`;
+    }
+
+    function updateCardControls(resultItem) {
+        const { brightness, contrast, saturation } = resultItem.adjustments;
+        const panel = resultItem.cardElement.querySelector('.adjustment-panel');
+        if (!panel) return;
+
+        const brightnessSlider = panel.querySelector('.brightness-slider');
+        if (brightnessSlider) {
+            brightnessSlider.value = brightness;
+            const brightnessLabel = brightnessSlider.previousElementSibling;
+            if (brightnessLabel) {
+                const valueDisplay = brightnessLabel.querySelector('.value-display');
+                if (valueDisplay) valueDisplay.textContent = `${brightness}%`;
+            }
+        }
+
+        const contrastSlider = panel.querySelector('.contrast-slider');
+        if (contrastSlider) {
+            contrastSlider.value = contrast;
+            const contrastLabel = contrastSlider.previousElementSibling;
+            if (contrastLabel) {
+                const valueDisplay = contrastLabel.querySelector('.value-display');
+                if (valueDisplay) valueDisplay.textContent = `${contrast}%`;
+            }
+        }
+
+        const saturationSlider = panel.querySelector('.saturation-slider');
+        if (saturationSlider) {
+            saturationSlider.value = saturation;
+            const saturationLabel = saturationSlider.previousElementSibling;
+            if (saturationLabel) {
+                const valueDisplay = saturationLabel.querySelector('.value-display');
+                if (valueDisplay) valueDisplay.textContent = `${saturation}%`;
+            }
+        }
+    }
+
+    function openModal(originalUrl, correctedUrl, resultItem) {
+        const aspectRatio = resultItem.aspectRatio || 1;
+        
+        DOM.modalContent.innerHTML = `
+            <div class="comparator interactive-mode" style="aspect-ratio: ${aspectRatio};">
+                <span class="comparator-label calibrated">Imagen Calibrada</span>
+                <span class="comparator-label original">Imagen Original</span>
+                <img src="${correctedUrl}" alt="Imagen Corregida" class="corrected-image">
+                <img src="${originalUrl}" alt="Imagen Original" class="original-image">
+                <div class="slider"><div class="slider-handle"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 15L12 18.75 15.75 15m-7.5-6L12 5.25 15.75 9" /></svg></div></div>
+            </div>`;
+        
+        const correctedImageInModal = DOM.modalContent.querySelector('.corrected-image');
+        const { brightness, contrast, saturation } = resultItem.adjustments;
+        correctedImageInModal.style.filter = `brightness(${brightness}%) contrast(${contrast}%) saturate(${saturation}%)`;
+
+        initializeComparator(DOM.modalContent.querySelector('.comparator'));
+        DOM.comparatorModal.style.display = 'flex';
+        document.body.classList.add('modal-open');
+    }
+
+    function closeModal() {
+        DOM.comparatorModal.style.display = 'none';
+        DOM.modalContent.innerHTML = '';
+        DOM.helpModal.style.display = 'none';
+        document.body.classList.remove('modal-open');
+    }
+    
+    DOM.helpBtn.addEventListener('click', () => { DOM.helpModal.style.display = 'flex'; document.body.classList.add('modal-open'); });
+    DOM.closeModalBtn.addEventListener('click', closeModal);
+    DOM.closeHelpModalBtn.addEventListener('click', closeModal);
+    DOM.helpModal.addEventListener('click', (e) => { if (e.target === DOM.helpModal) closeModal(); });
+    DOM.comparatorModal.addEventListener('click', (e) => { if (e.target === DOM.comparatorModal) closeModal(); });
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeModal(); });
+
+    // ▼▼▼ MODIFICACIÓN 2: LÓGICA DE JAVASCRIPT PARA RESALTADO DE ETIQUETAS ▼▼▼
+    function initializeComparator(comparator) {
+        const topImage = comparator.querySelector('.original-image');
+        const slider = comparator.querySelector('.slider');
+        const originalLabel = comparator.querySelector('.comparator-label.original');
+        const calibratedLabel = comparator.querySelector('.comparator-label.calibrated');
+        let isDragging = false;
+        
+        function updateSliderPosition(x) {
+            const rect = comparator.getBoundingClientRect();
+            const clampedX = Math.max(0, Math.min(x - rect.left, rect.width));
+            const percentage = (clampedX / rect.width) * 100;
+            
+            // Lógica para resaltar etiquetas
+            if (percentage < 10) { // Mayormente visible la original
+                originalLabel.classList.add('is-active');
+                calibratedLabel.classList.remove('is-active');
+            } else if (percentage > 90) { // Mayormente visible la calibrada
+                originalLabel.classList.remove('is-active');
+                calibratedLabel.classList.add('is-active');
+            } else { // Posición intermedia
+                originalLabel.classList.remove('is-active');
+                calibratedLabel.classList.remove('is-active');
+            }
+
+            requestAnimationFrame(() => {
+                topImage.style.clipPath = `inset(0 ${100 - percentage}% 0 0)`;
+                if(slider) slider.style.left = `${percentage}%`;
+            });
+        }
+        
+        comparator.addEventListener('pointerdown', (e) => { 
+            e.preventDefault(); 
+            isDragging = true; 
+            updateSliderPosition(e.clientX); // Actualiza al hacer clic
+        });
+        window.addEventListener('pointerup', () => {
+            if (isDragging) {
+                 isDragging = false;
+            }
+        }, { once: true }); // Usamos once para que el listener se autoremueva
+        
+        // Usamos un listener persistente en window para el movimiento
+        const handlePointerMove = (e) => {
+            if (isDragging) {
+                updateSliderPosition(e.clientX);
+            }
+        };
+
+        // Adjuntar el listener de movimiento a window
+        window.addEventListener('pointermove', handlePointerMove);
+        
+        // Limpiar el listener de movimiento cuando el modal se cierra para evitar fugas de memoria
+        const observer = new MutationObserver((mutations) => {
+            mutations.forEach((mutation) => {
+                if(mutation.target.style.display === 'none') {
+                    window.removeEventListener('pointermove', handlePointerMove);
+                    observer.disconnect();
+                }
+            });
+        });
+        if(comparator.closest('.modal')) {
+             observer.observe(comparator.closest('.modal'), { attributes: true });
+        }
+    }
+    // ▲▲▲ FIN DE MODIFICACIÓN 2 ▲▲▲
+
+    async function downloadAllAsZip(buttonElement) {
+        if (resultState.length === 0) return;
+        const originalText = buttonElement.innerHTML;
+        buttonElement.innerHTML = '<span class="spinner"></span> Generando ZIP...';
+        buttonElement.disabled = true;
+
+        try {
+            const zip = new JSZip();
+            for (const item of resultState) {
+                const finalBlob = await applyAdjustmentsToBlob(item.initialCorrectedBlob, item.adjustments);
+                const originalName = item.sourceFile.name;
+                const newName = `${originalName.split('.').slice(0, -1).join('.')}_calibrated.jpg`;
+                zip.file(newName, finalBlob);
+            }
+
+            const content = await zip.generateAsync({ type: "blob" });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(content);
+            const baseName = DOM.baseNameInput.value.trim();
+            link.download = `Pamesa_Calibraciones${baseName ? `_${baseName}` : ''}.zip`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(link.href);
+
+            showNotification('¡Éxito! Tu ZIP se ha guardado en Descargas.');
+
+        } catch (error) {
+            console.error('ZIP generation failed:', error);
+            alert('Hubo un error al generar el archivo ZIP.');
+        } finally {
+            buttonElement.innerHTML = originalText;
+            buttonElement.disabled = false;
+        }
+    }
+
+    async function applyAdjustmentsToBlob(blob, adjustments) {
+        const img = new Image();
+        const url = URL.createObjectURL(blob);
+        img.src = url;
+        await new Promise(resolve => img.onload = resolve);
+        URL.revokeObjectURL(url);
+        const canvas = document.createElement('canvas');
+        canvas.width = img.width; canvas.height = img.height;
+        const ctx = canvas.getContext('2d');
+        ctx.filter = `brightness(${adjustments.brightness}%) contrast(${adjustments.contrast}%) saturate(${adjustments.saturation}%)`;
+        ctx.drawImage(img, 0, 0);
+        return new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.95));
+    }
+    
+    function extractBaseNameFromFile(filename) {
+        let baseName = filename.substring(0, filename.lastIndexOf('.')) || filename;
+        return baseName.replace(/_\d{2}$/, '').replace(/_\d+[xX]\d+$/, '').replace(/[\s_]/g, '-');
+    }
+
+    // --- Color Space & Statistics Engine ---
+    function convertToLab(imageData) { const pixels = imageData.data, labData = []; for (let i = 0; i < pixels.length; i += 4) { labData.push(rgbToLab([pixels[i], pixels[i+1], pixels[i+2]])); } return labData; }
+    function transferColor(sourceImageData, targetStats) { const sourceLab = convertToLab(sourceImageData); const sourceStats = calculateStats(sourceLab); const resultLab = sourceLab.map(pixel => { const l = ((pixel[0] - sourceStats.l.mean) * (targetStats.l.stdDev / (sourceStats.l.stdDev || 1))) + targetStats.l.mean; const a = ((pixel[1] - sourceStats.a.mean) * (targetStats.a.stdDev / (sourceStats.a.stdDev || 1))) + targetStats.a.mean; const b = ((pixel[2] - sourceStats.b.mean) * (targetStats.b.stdDev / (sourceStats.b.stdDev || 1))) + targetStats.b.mean; return [l, a, b]; }); const resultImageData = new ImageData(sourceImageData.width, sourceImageData.height); for (let i = 0; i < resultLab.length; i++) { const rgb = labToRgb(resultLab[i]); resultImageData.data[i * 4] = rgb[0]; resultImageData.data[i * 4 + 1] = rgb[1]; resultImageData.data[i * 4 + 2] = rgb[2]; resultImageData.data[i * 4 + 3] = 255; } return resultImageData; }
+    function rgbToLab(rgb) { let r = rgb[0] / 255, g = rgb[1] / 255, b = rgb[2] / 255; r = (r > 0.04045) ? Math.pow((r + 0.055) / 1.055, 2.4) : r / 12.92; g = (g > 0.04045) ? Math.pow((g + 0.055) / 1.055, 2.4) : g / 12.92; b = (b > 0.04045) ? Math.pow((b + 0.055) / 1.055, 2.4) : b / 12.92; let x = (r * 0.4124 + g * 0.3576 + b * 0.1805) / 0.95047; let y = (r * 0.2126 + g * 0.7152 + b * 0.0722) / 1.00000; let z = (r * 0.0193 + g * 0.1192 + b * 0.9505) / 1.08883; x = (x > 0.008856) ? Math.pow(x, 1/3) : (7.787 * x) + 16/116; y = (y > 0.008856) ? Math.pow(y, 1/3) : (7.787 * y) + 16/116; z = (z > 0.008856) ? Math.pow(z, 1/3) : (7.787 * z) + 16/116; return [(116 * y) - 16, 500 * (x - y), 200 * (y - z)]; }
+    function labToRgb(lab) { let y = (lab[0] + 16) / 116, x = lab[1] / 500 + y, z = y - lab[2] / 200; const x3 = x * x * x, y3 = y * y * y, z3 = z * z * z; x = (x3 > 0.008856) ? x3 : (x - 16/116) / 7.787; y = (y3 > 0.008856) ? y3 : (y - 16/116) / 7.787; z = (z3 > 0.008856) ? z3 : (z - 16/116) / 7.787; x = x * 0.95047; y = y * 1.00000; z = z * 1.08883; let r = x *  3.2406 + y * -1.5372 + z * -0.4986; let g = x * -0.9689 + y *  1.8758 + z *  0.0415; let b = x *  0.0557 + y * -0.2040 + z *  1.0570; r = (r > 0.0031308) ? 1.055 * Math.pow(r, 1/2.4) - 0.055 : 12.92 * r; g = (g > 0.0031308) ? 1.055 * Math.pow(g, 1/2.4) - 0.055 : 12.92 * g; b = (b > 0.0031308) ? 1.055 * Math.pow(b, 1/2.4) - 0.055 : 12.92 * b; return [Math.max(0, Math.min(255, r * 255)), Math.max(0, Math.min(255, g * 255)), Math.max(0, Math.min(255, b * 255))]; }
+    function getMean(data) { return data.reduce((a, b) => a + b) / data.length; }
+    function getStdDev(data, mean) { const sqDiff = data.map(n => Math.pow(n - mean, 2)); return Math.sqrt(sqDiff.reduce((a, b) => a + b) / data.length); }
+    function calculateStats(labData) { const l = [], a = [], b = []; for(let i = 0; i < labData.length; i++) { l.push(labData[i][0]); a.push(labData[i][1]); b.push(labData[i][2]); } const meanL = getMean(l); const meanA = getMean(a); const meanB = getMean(b); return { l: { mean: meanL, stdDev: getStdDev(l, meanL) }, a: { mean: meanA, stdDev: getStdDev(a, meanA) }, b: { mean: meanB, stdDev: getStdDev(b, meanB) }, }; }
+});
+</script>
+</body>
+</html>

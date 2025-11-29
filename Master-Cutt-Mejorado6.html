@@ -1,0 +1,1718 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pamesa - Master Cutt</title>
+    
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+
+    <style>
+        /* --- VARIABLES DE DISEÑO Y CONFIGURACIÓN GLOBAL (DESDE HUB) --- */
+        :root {
+            --pamesa-red: #CC0000;
+            --pamesa-red-dark: #A30000;
+            --pamesa-text-dark: #1a1a1a;
+            --pamesa-text-light: #5f676d;
+            --pamesa-background-light: #f8f9fa;
+            --pamesa-border-color: #e9ecef;
+            --pamesa-white: #ffffff;
+            --pamesa-success: #28a745;
+            --pamesa-warning: #ffc107;
+            --pamesa-info: #17a2b8;
+            --shadow-sm: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+            --shadow-md: 0 10px 15px -3px rgba(0, 0, 0, 0.07), 0 4px 6px -2px rgba(0, 0, 0, 0.04);
+        }
+    
+        /* --- ESTILOS GLOBALES (DESDE HUB) --- */
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        html { scroll-behavior: smooth; }
+        body { font-family: 'Montserrat', sans-serif; background-color: var(--pamesa-background-light); color: var(--pamesa-text-dark); margin: 0; line-height: 1.6; overflow: hidden; }
+        body.modal-open { overflow: hidden; }
+    
+        /* --- PANTALLA DE BIENVENIDA --- */
+        #welcomeScreen { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 9999; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; padding-bottom: 10vh; box-sizing: border-box; transition: opacity 0.5s ease-in-out; }
+        #bgVideo { position: absolute; top: 50%; left: 50%; min-width: 100%; min-height: 100%; width: auto; height: auto; z-index: -2; transform: translateX(-50%) translateY(-50%); object-fit: cover; }
+        .video-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0, 0, 0, 0.4); z-index: -1; }
+        
+        /* --- ESTRUCTURA DE LA APLICACIÓN --- */
+        .app-layout { display: none; height: 100vh; flex-direction: row; }
+        .control-panel { width: 420px; flex-shrink: 0; background-color: var(--pamesa-white); box-shadow: var(--shadow-md); display: flex; flex-direction: column; z-index: 10; transition: opacity 0.3s ease-in-out; }
+        .control-panel.is-processing { opacity: 0.7; pointer-events: none; }
+        .control-panel-header { display: flex; align-items: center; padding: 15px 30px; border-bottom: 1px solid var(--pamesa-border-color); background-color: var(--pamesa-red); }
+        .back-to-hub-link { display: inline-block; line-height: 0; transition: opacity 0.3s ease; }
+        .back-to-hub-link:hover { opacity: 0.85; }
+        .control-panel-header img { height: 40px; width: auto; filter: brightness(0) invert(1); }
+        .control-panel-body { padding: 30px; overflow-y: auto; flex-grow: 1; }
+        .results-canvas { flex-grow: 1; padding: 40px; overflow-y: auto; background-color: var(--pamesa-background-light); display: flex; flex-direction: column; }
+        
+        h1 { color: var(--pamesa-text-dark); margin: 0; font-weight: 700; font-size: 1.8em; }
+        .title-container { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+        #helpBtn, #newCutBtn { background-color: transparent; border: none; padding: 0; cursor: pointer; color: var(--pamesa-text-light); transition: color 0.2s ease-in-out; display: flex; align-items: center; justify-content: center; }
+        #helpBtn:hover, #newCutBtn:hover { color: var(--pamesa-red); }
+        #helpBtn svg, #newCutBtn svg { width: 24px; height: 24px; }
+        p.subtitle { color: var(--pamesa-text-light); line-height: 1.6; margin: 0 0 25px; }
+        
+        /* --- COMPONENTES REUTILIZABLES: BOTONES --- */
+        .btn { display: inline-flex; text-decoration: none; font-weight: 600; font-size: 0.95rem; padding: 12px 28px; border-radius: 50px; transition: all 0.3s ease; border: 2px solid transparent; cursor: pointer; justify-content: center; align-items: center; gap: 10px; }
+        .btn-primary { color: var(--pamesa-white); background-color: var(--pamesa-red); position: relative; overflow: hidden; width: 100%; }
+        .btn-primary:hover:not(:disabled) { background-color: var(--pamesa-red-dark); transform: translateY(-3px); box-shadow: 0 10px 20px rgba(204, 0, 0, 0.2); }
+        .btn-primary::after { content: ''; position: absolute; top: 0; left: -150%; width: 100%; height: 100%; background: linear-gradient(110deg, rgba(255, 255, 255, 0) 40%, rgba(255, 255, 255, 0.25) 50%, rgba(255, 255, 255, 0) 60%); transform: skewX(-25deg); transition: left 0.8s ease-in-out; }
+        .btn-primary:hover::after { left: 150%; }
+        .btn-secondary { color: var(--pamesa-text-dark); background-color: transparent; border-color: var(--pamesa-border-color); width: 100%; }
+        .btn-secondary:hover:not(:disabled) { background-color: var(--pamesa-background-light); border-color: var(--pamesa-text-light); }
+        .btn-danger { color: var(--pamesa-red); background-color: transparent; border-color: var(--pamesa-border-color); }
+        .btn-danger:hover:not(:disabled) { background-color: #fff5f5; border-color: var(--pamesa-red); }
+        .btn:disabled, .btn.disabled { background-color: #9e9e9e; cursor: not-allowed; box-shadow: none; transform: none; border-color: transparent; color: var(--pamesa-white); opacity: 1; }
+        .btn .icon { width: 18px; height: 18px; }
+        .spinner { width: 18px; height: 18px; border: 2px solid rgba(255,255,255,0.3); border-top-color: #fff; border-radius: 50%; animation: spin 1s linear infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .button-group { display: flex; flex-direction: column; gap: 12px; margin-top: 10px; }
+        
+        /* --- NUEVA SELECCIÓN DE FLUJO DE TRABAJO --- */
+        #workflowSelection { display: flex; flex-direction: column; gap: 15px; margin-top: 40px; }
+        .workflow-btn { 
+            display: flex; 
+            flex-direction: column; 
+            align-items: center; 
+            text-align: center; 
+            padding: 25px 20px; 
+            border: 2px solid var(--pamesa-border-color); 
+            border-radius: 5px; 
+            cursor: pointer; 
+            transition: all 0.3s ease;
+            justify-content: center;
+            position: relative;
+            overflow: hidden;
+            min-height: 150px;
+        }
+        .workflow-btn:hover { 
+            border-color: var(--pamesa-red); 
+            transform: translateY(-5px); 
+            box-shadow: var(--shadow-md); 
+        }
+        .workflow-btn .workflow-title { 
+            font-size: 1.5em; 
+            font-weight: 700; 
+            color: var(--pamesa-white); 
+            margin: 0;
+            text-shadow: 0 1px 5px rgba(0,0,0,0.8);
+        }
+        .workflow-btn .workflow-description { 
+            font-size: 1em; 
+            color: #f0f0f0; 
+            margin-top: 5px;
+            text-shadow: 0 1px 3px rgba(0,0,0,0.8);
+        }
+        #processingInterface { display: none; }
+
+        /* --- ESTILOS PARA BOTONES CON IMAGEN DE FONDO --- */
+        #selectCeramicBtn, #selectWoodBtn, #selectCustomBtn {
+            background-size: cover;
+            background-position: center;
+        }
+        #selectCeramicBtn { 
+            background-image: linear-gradient(rgba(0,0,0,0.5), rgba(0,0,0,0.5)), url('images/placa.jpg'); 
+        }
+        #selectWoodBtn { 
+            background-image: linear-gradient(rgba(0,0,0,0.5), rgba(0,0,0,0.5)), url('images/madera.jpg'); 
+        }
+        #selectCustomBtn {
+            background-image: linear-gradient(rgba(0,0,0,0.5), rgba(0,0,0,0.5)), url('images/custom.jpg');
+        }
+
+        #selectCeramicBtn:hover { 
+            background-image: linear-gradient(rgba(0,0,0,0.35), rgba(0,0,0,0.35)), url('images/placa.jpg'); 
+        }
+        #selectWoodBtn:hover { 
+            background-image: linear-gradient(rgba(0,0,0,0.35), rgba(0,0,0,0.35)), url('images/madera.jpg'); 
+        }
+        #selectCustomBtn:hover {
+            background-image: linear-gradient(rgba(0,0,0,0.35), rgba(0,0,0,0.35)), url('images/custom.jpg');
+        }
+
+        /* --- ÁREA DE SUBIDA --- */
+        #upload-area { border: 2px dashed var(--pamesa-border-color); border-radius: 16px; padding: 30px 20px; margin: 20px 0; cursor: pointer; background-color: var(--pamesa-white); transition: background-color 0.3s, border-color 0.3s; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; }
+        #upload-area .upload-icon { width: 48px; height: 48px; color: var(--pamesa-red); margin-bottom: 15px; transition: transform 0.3s, color 0.3s; }
+        #upload-area .upload-text-main { font-weight: 600; font-size: 1.1em; color: var(--pamesa-text-dark); margin: 0 0 5px 0; }
+        #upload-area .upload-text-secondary { color: var(--pamesa-text-light); margin: 0; }
+        #upload-area .upload-text-secondary strong { color: var(--pamesa-red); font-weight: 600; cursor: pointer; }
+        #upload-area:hover { border-color: var(--pamesa-red); background-color: #fffafaf5; }
+        #upload-area.drag-over { border-style: solid; border-color: var(--pamesa-red-dark); background-color: #fff5f5; }
+        #upload-area.drag-over .upload-icon { transform: scale(1.1); color: var(--pamesa-red-dark); }
+        #imageLoader { display: none; }
+    
+        /* --- CONTROLES Y FORMULARIO --- */
+        #previewContainer { margin-top: 15px; display: flex; flex-wrap: wrap; gap: 10px; justify-content: flex-start; }
+        .preview-item { position: relative; border: 2px solid var(--pamesa-border-color); border-radius: 8px; padding: 4px; background-color: white; width: 80px; text-align: center; box-shadow: var(--shadow-sm); }
+        .preview-item img { width: 100%; aspect-ratio: 1 / 1; object-fit: cover; display: block; border-radius: 4px; }
+        .remove-btn { position: absolute; top: -10px; right: -10px; background-color: var(--pamesa-red); color: white; border-radius: 50%; width: 22px; height: 22px; display: flex; align-items: center; justify-content: center; font-weight: bold; cursor: pointer; border: 2px solid white; box-shadow: 0 1px 3px rgba(0,0,0,0.2); }
+        .preview-item.invalid { border-color: var(--pamesa-red); background-color: #fff5f5; }
+        .error-message { font-size: 9px; font-weight: 600; color: var(--pamesa-red-dark); margin-top: 4px; }
+        .control-group { margin: 25px 0; }
+        .control-group label { display: block; font-weight: 600; margin-bottom: 8px; font-size: 0.95em; }
+        .control-group input[type="text"], .control-group input[type="number"] { width: 100%; padding: 12px; border: 1px solid var(--pamesa-border-color); border-radius: 8px; box-sizing: border-box; transition: border-color 0.2s, box-shadow 0.2s; font-size: 1em; }
+        .control-group input[type="text"]:focus, .control-group input[type="number"]:focus { border-color: var(--pamesa-red); box-shadow: 0 0 0 3px rgba(204, 0, 0, 0.15); outline: none; }
+        #cuttingOptions h3 { margin: 0 0 15px 0; font-size: 0.95em; font-weight: 600;}
+        .option { display: block; margin-bottom: 12px; cursor: pointer; font-size: 0.9em; }
+        .option input { margin-right: 10px; accent-color: var(--pamesa-red); }
+        #globalDownloadContainer { margin-top: 20px; display: flex; flex-direction: column; gap: 12px; }
+
+        /* Opciones de corte personalizado */
+        #customCuttingOptions .input-group { display: flex; gap: 15px; }
+        #customCuttingOptions .input-group .control-group { flex: 1; margin: 0; }
+        #customCuttingOptions .sub-control-group { margin-top: 20px; }
+        #customCuttingOptions .radio-group label { display: inline-block; margin-right: 20px; font-weight: 500; cursor: pointer; }
+        #customCuttingOptions .radio-group input { margin-right: 5px; accent-color: var(--pamesa-red); }
+        #rotationOptionContainer { margin-top: 10px; padding-left: 5px; }
+        #rotationOptionContainer label { font-weight: 500; cursor: pointer;}
+        #rotationOptionContainer input { margin-right: 8px; accent-color: var(--pamesa-red); }
+
+    
+        /* --- PANEL DE RESULTADOS Y PESTAÑAS --- */
+        .results-tabs { display: flex; border-bottom: 2px solid var(--pamesa-border-color); margin-bottom: 30px; }
+        .tab-btn { background: none; border: none; padding: 12px 20px; font-size: 1em; font-weight: 600; cursor: pointer; color: var(--pamesa-text-light); border-bottom: 3px solid transparent; transition: all 0.2s ease-in-out; margin-bottom: -2px; }
+        .tab-btn.active { color: var(--pamesa-red); border-bottom-color: var(--pamesa-red); }
+        .tab-content { flex-grow: 1; display: flex; }
+        .tab-pane { display: none; width: 100%; }
+        .tab-pane.active { display: flex; flex-direction: column; }
+        #resultsInitialState { display: flex; flex-direction: column; align-items: center; justify-content: center; flex-grow: 1; text-align: center; color: #ccc; transition: opacity 0.3s ease-out; }
+        #resultsInitialState svg { width: 100px; height: 100px; margin-bottom: 20px; }
+        #resultsInitialState h2 { margin: 0; font-size: 1.5em; color: #ccc; }
+        #resultsContainer { width: 100%; }
+        .format-group { background: var(--pamesa-white); border: 1px solid var(--pamesa-border-color); border-radius: 16px; padding: 25px; margin-bottom: 25px; width:100%; box-sizing: border-box; box-shadow: var(--shadow-sm); transition: all 0.4s ease-in-out; }
+        .format-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--pamesa-border-color); padding-bottom: 15px; margin-bottom: 20px; }
+        .title-wrapper { display: flex; flex-direction: column; }
+        .model-title { font-size: 1em; font-weight: 600; color: var(--pamesa-text-light); margin: 0 0 4px 0; }
+        .format-title { font-size: 1.2em; color: var(--pamesa-text-dark); margin: 0; font-weight: 700; }
+        .format-header-buttons { display: flex; gap: 10px; }
+        .format-header .btn { padding: 8px 20px; font-size: 0.85rem; width: auto; border-radius: 25px;}
+        .pieces-container { display: flex; flex-wrap: wrap; gap: 15px; align-items: flex-start; }
+        .piece-item { text-align: center; opacity: 0; transform: scale(0.8); }
+        .piece-item.visible { animation: fadeInPlace 0.4s forwards ease-out; }
+        @keyframes fadeInPlace { to { opacity: 1; transform: scale(1); } }
+        .piece-item img { border: 2px solid var(--pamesa-border-color); border-radius: 4px; display: block; cursor: pointer; transition: transform 0.2s, box-shadow 0.2s; }
+        .piece-item img.piece-tall { object-fit: contain; width: auto; background-color: #f0f0f0; }
+        .piece-item img:hover { transform: scale(1.05); box-shadow: var(--shadow-sm); }
+        .piece-item p { font-size: 13px; margin-top: 8px; color: var(--pamesa-text-dark); font-weight: 600; }
+        .format-group.processing { background-color: #fcfcfc; border-style: dashed; box-shadow: none; }
+        .format-group .format-status { display: flex; align-items: center; gap: 10px; font-size: 14px; color: var(--pamesa-text-light); }
+        .format-group .status-spinner { width: 18px; height: 18px; border: 2px solid rgba(0,0,0,0.1); border-top-color: var(--pamesa-red); border-radius: 50%; animation: spin 1s linear infinite; transition: all 0.3s ease-in-out; }
+        .format-group .status-check { width: 20px; height: 20px; color: var(--pamesa-success); transform: scale(0); opacity: 0; transition: all 0.3s ease-in-out; }
+        .format-group.completed .status-spinner { transform: scale(0); opacity: 0; width: 0; }
+        .format-group.completed .status-check { transform: scale(1); opacity: 1; }
+        .format-group.completed { border-style: solid; border-color: var(--pamesa-success); }
+        .format-group .format-header-buttons .btn { transform: scale(0.8); opacity: 0; transition: all 0.3s ease-out; pointer-events: none; }
+        .format-group.completed .format-header-buttons .btn { transform: scale(1); opacity: 1; pointer-events: all; }
+        
+        /* --- ESTILOS DE COLA DE PROCESAMIENTO --- */
+        #queueActions { margin-bottom: 20px; display: flex; justify-content: flex-end; gap: 12px; }
+        #queueContainer { display: flex; flex-direction: column; gap: 15px; }
+        .queue-item { background: var(--pamesa-white); border-radius: 12px; padding: 15px 20px; display: flex; align-items: center; gap: 20px; box-shadow: var(--shadow-sm); border-left: 5px solid; transition: all 0.4s ease; opacity: 1; max-height: 300px; }
+        .queue-item.removing { opacity: 0; max-height: 0; padding-top: 0; padding-bottom: 0; margin-bottom: -15px; border-width: 0; }
+        .queue-item .job-info { flex-grow: 1; }
+        .queue-item .job-title { font-weight: 700; color: var(--pamesa-text-dark); }
+        .queue-item .job-details { font-size: 0.85em; color: var(--pamesa-text-light); }
+        .queue-item .job-status { display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: 0.9em; }
+        .queue-item .job-status svg { width: 22px; height: 22px; }
+        .queue-item .job-actions { display:flex; align-items:center; gap: 10px; }
+        .queue-item .job-actions .btn { width: auto; font-size: 0.85rem; padding: 8px 18px; }
+        .queue-item .job-actions .spinner { border-top-color: var(--pamesa-red); border-right-color: transparent; border-bottom-color: transparent; }
+        .queue-item .job-actions .action-btn { background: none; border: none; cursor: pointer; color: var(--pamesa-text-light); padding: 5px; line-height: 0; border-radius: 50%; transition: background-color 0.2s, color 0.2s; }
+        .queue-item .job-actions .action-btn:hover { background-color: #f0f0f0; color: var(--pamesa-red); }
+        .queue-item .job-actions .action-btn svg { width: 20px; height: 20px; }
+        .queue-item.status-queued { border-left-color: var(--pamesa-info); }
+        .queue-item.status-queued .job-status { color: var(--pamesa-info); }
+        .queue-item.status-processing { border-left-color: var(--pamesa-warning); animation: pulse-border 1.5s infinite; }
+        @keyframes pulse-border { 0% { border-left-color: var(--pamesa-warning); } 50% { border-left-color: #ffd966; } 100% { border-left-color: var(--pamesa-warning); } }
+        .queue-item.status-processing .job-status { color: var(--pamesa-warning); }
+        .queue-item.status-completed { border-left-color: var(--pamesa-success); }
+        .queue-item.status-completed .job-status { color: var(--pamesa-success); }
+        .queue-item.status-error { border-left-color: var(--pamesa-red); }
+        .queue-item.status-error .job-status { color: var(--pamesa-red); }
+    
+        /* --- ESTILOS BARRA DE PROGRESO --- */
+        .progress-container { width: 100%; margin-top: 5px; }
+        .progress-text { font-size: 0.8em; color: var(--pamesa-text-light); margin-bottom: 3px; font-weight: 500; }
+        .progress-bar-background { background-color: var(--pamesa-border-color); border-radius: 5px; height: 6px; overflow: hidden; }
+        .progress-bar { background-color: var(--pamesa-warning); width: 0%; height: 100%; border-radius: 5px; transition: width 0.3s ease-out; }
+    
+        /* --- ESTILOS DE MODALES --- */
+        .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; overflow: auto; background-color: rgba(0,0,0,0.85); align-items: center; justify-content: center; backdrop-filter: blur(5px); }
+        .modal-close { cursor: pointer; position: absolute; top: 15px; right: 35px; color: white; font-weight: bold; font-size: 45px; transition: 0.3s; user-select: none; z-index: 1050; }
+        .modal-close:hover { color: #bbb; }
+        #galleryModal .modal-content { position: relative; text-align: center; max-width: 90vw; max-height: 90vh; }
+        #modalImage { max-width: 100%; max-height: 80vh; display: block; margin: auto; }
+        .modal-nav { cursor: pointer; position: absolute; color: white; font-weight: bold; font-size: 30px; transition: 0.3s; user-select: none; top: 50%; transform: translateY(-50%); padding: 16px; background-color: rgba(0,0,0,0.3); }
+        #modalPrev { left: 0; border-radius: 0 3px 3px 0; }
+        #modalNext { right: 0; border-radius: 3px 0 0 3px; }
+        .modal-nav.disabled { opacity: 0.3; cursor: not-allowed; }
+        #modalCounter { color: #ccc; font-size: 16px; padding: 15px 0; font-weight: 500; }
+        #placementModal .modal-content-wrapper { position: relative; width: 95%; height: 95%; }
+        #placementModal .modal-content { width: 100%; height: 100%; background-color: var(--pamesa-text-dark); padding: 20px; box-sizing: border-box; overflow: auto; border-radius: 8px; }
+        #placementGrid { display: grid; gap: 2px; }
+        #placementGrid img { width: 100%; height: 100%; object-fit: cover; display: block; }
+        #downloadPlacementBtn { position: absolute; top: 25px; right: 80px; z-index: 1051; background-color: var(--pamesa-red); width: auto; font-size: 0.8rem; }
+        #downloadPlacementBtn:disabled { background-color: #9e9e9e; cursor: wait; }
+        #helpModal .modal-content, #layoutSelectionModal .modal-content { background-color: var(--pamesa-white); color: var(--pamesa-text-dark); padding: 30px 40px; border-radius: 16px; max-width: 850px; width: 90%; max-height: 90vh; overflow-y: auto; text-align: left; position: relative; box-sizing: border-box; box-shadow: var(--shadow-md); }
+        #layoutSelectionModal .modal-content { max-width: 500px; text-align: center; }
+        #helpModal .modal-close, #layoutSelectionModal .modal-close { color: var(--pamesa-text-light); top: 15px; right: 20px; font-size: 35px; }
+        #helpModal h2, #layoutSelectionModal h2 { font-size: 1.6em; color: var(--pamesa-red); margin-top: 0; margin-bottom: 20px; }
+        #layoutSelectionModal p { color: var(--pamesa-text-light); margin-bottom: 25px; }
+        #layoutOptionsContainer { display: flex; flex-wrap: wrap; justify-content: center; gap: 15px; }
+        #layoutOptionsContainer .btn { width: auto; min-width: 120px; }
+        #helpModal p, #helpModal li { line-height: 1.7; color: var(--pamesa-text-light); }
+        #helpModal ol { padding-left: 25px; }
+        #helpModal li { margin-bottom: 15px; }
+        #helpModal strong { color: var(--pamesa-text-dark); font-weight: 600; }
+        #helpModal .modal-footer { text-align: right; margin-top: 30px; }
+        #helpModal .modal-footer .btn {width: auto;}
+    
+        /* --- NOTIFICACIÓN --- */
+        .notification-toast { position: fixed; bottom: 30px; left: 50%; transform: translate(-50%, 150%); background-color: var(--pamesa-success); color: var(--pamesa-white); padding: 15px 25px; border-radius: 50px; box-shadow: 0 4px 15px rgba(0,0,0,0.2); z-index: 10001; display: flex; align-items: center; gap: 15px; font-weight: 600; opacity: 0; visibility: hidden; transition: transform 0.4s cubic-bezier(0.215, 0.610, 0.355, 1), opacity 0.4s ease, visibility 0.4s; }
+        .notification-toast.show { transform: translate(-50%, 0); opacity: 1; visibility: visible; }
+        .notification-toast svg { width: 24px; height: 24px; }
+    </style>
+</head>
+<body>
+
+    <div id="welcomeScreen">
+        <div class="video-overlay"></div>
+        <video autoplay muted loop id="bgVideo">
+            <source src="videoincio.mp4" type="video/mp4">
+            Tu navegador no soporta vídeos HTML5.
+        </video>
+        <button id="enterAppBtn" class="btn btn-primary" style="width: auto; font-size: 1.2rem; padding: 15px 40px;">Pamesa Master Cutt</button>
+    </div>
+
+    <div class="app-layout">
+        <aside class="control-panel" id="controlPanel">
+            <header class="control-panel-header">
+                <a href="Productivity Hub.html" class="back-to-hub-link" title="Volver al Hub de Productividad">
+                    <img src="logo-pamesa_blanco.svg" alt="Pamesa Cerámica Logo">
+                </a>
+            </header>
+
+            <div class="control-panel-body">
+                <div class="title-container">
+                    <h1>Master Cutt</h1>
+                    <button id="helpBtn" title="Ayuda">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m11.25 11.25.041-.02a.75.75 0 0 1 1.063.852l-.708 2.836a.75.75 0 0 0 1.063.853l.041-.021M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9-3.75h.008v.008H12V8.25Z" /></svg>
+                    </button>
+                    <button id="newCutBtn" title="Nuevo Recorte">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.134-2.036-2.134H8.718c-1.126 0-2.037.955-2.037 2.134v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" /></svg>
+                    </button>
+                </div>
+
+                <p class="subtitle" id="mainSubtitle">Selecciona el tipo de material que quieres procesar para comenzar.</p>
+                
+                <!-- NUEVA SELECCIÓN DE FLUJO DE TRABAJO -->
+                <div id="workflowSelection">
+                    <button class="workflow-btn" id="selectCeramicBtn">
+                        <h3 class="workflow-title">Procesar Placa Cerámica</h3>
+                        <p class="workflow-description">Para matrices de 120x120cm y 120x280cm.</p>
+                    </button>
+                    <button class="workflow-btn" id="selectWoodBtn">
+                        <h3 class="workflow-title">Procesar Lama de Madera</h3>
+                        <p class="workflow-description">Para matrices de 120x60cm.</p>
+                    </button>
+                    <button class="workflow-btn" id="selectCustomBtn">
+                        <h3 class="workflow-title">Corte Personalizado</h3>
+                        <p class="workflow-description">Sube cualquier imagen y define tus propios formatos.</p>
+                    </button>
+                </div>
+
+                <!-- INTERFAZ DE PROCESAMIENTO (OCULTA INICIALMENTE) -->
+                <div id="processingInterface">
+                    <label for="imageLoader" id="upload-area">
+                        <svg class="upload-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909m-18 3.75h16.5a1.5 1.5 0 001.5-1.5V6a1.5 1.5 0 00-1.5-1.5H3.75A1.5 1.5 0 002.25 6v12a1.5 1.5 0 001.5 1.5zm10.5-11.25h.008v.008h-.008V8.25zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z" /></svg>                      
+                        <p class="upload-text-main" id="uploadTextMain">Arrastra tus imágenes</p>
+                        <p class="upload-text-secondary">o <strong>haz clic para seleccionar</strong></p>
+                    </label>
+                    <input type="file" id="imageLoader" multiple accept="image/jpeg, image/png, image/webp">
+
+                    <div id="previewContainer"></div>
+
+                    <div class="control-group">
+                        <label for="baseNameInput">Nombre Base para los Archivos:</label>
+                        <input type="text" id="baseNameInput" placeholder="Ej: CORE-PRO-TAUPE">
+                    </div>
+
+                    <div class="control-group" id="cuttingOptions">
+                        <div id="ceramicCuttingOptions">
+                             <h3>Selecciona las etapas de corte:</h3>
+                        </div>
+                        <div id="woodCuttingOptions">
+                            <h3>Selecciona la etapa de corte:</h3>
+                        </div>
+                        <div id="customCuttingOptions">
+                            <h3>Define tu formato de salida</h3>
+                            <div class="input-group">
+                                <div class="control-group">
+                                    <label for="customWidth">Ancho (cm)</label>
+                                    <input type="number" id="customWidth" placeholder="Ej: 60">
+                                </div>
+                                <div class="control-group">
+                                    <label for="customHeight">Alto (cm)</label>
+                                    <input type="number" id="customHeight" placeholder="Ej: 90">
+                                </div>
+                            </div>
+                            <div class="sub-control-group">
+                                <label>Modo de Extracción</label>
+                                <div class="radio-group">
+                                    <label for="modeSingle"><input type="radio" name="extractionMode" id="modeSingle" value="single" checked> Pieza Única</label>
+                                    <label for="modeTiling"><input type="radio" name="extractionMode" id="modeTiling" value="tiling"> Múltiples Piezas (Tiling)</label>
+                                </div>
+                                <div id="rotationOptionContainer" style="display: none;">
+                                    <label for="allowRotation">
+                                        <input type="checkbox" id="allowRotation">
+                                        Permitir rotación de 90° para optimizar
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="button-group">
+                        <button id="processVisualBtn" class="btn btn-primary">
+                            <svg class="icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639l4.43-4.43a1.012 1.012 0 011.431 0l4.43 4.43a1.012 1.012 0 010 .639l-4.43 4.43a1.012 1.012 0 01-1.431 0l-4.43-4.43z" /><path stroke-linecap="round" stroke-linejoin="round" d="M21 12.322a1.012 1.012 0 010-.639l-4.43-4.43a1.012 1.012 0 01-1.431 0l-4.43 4.43a1.012 1.012 0 010 .639l4.43 4.43a1.012 1.012 0 011.431 0l4.43 4.43z" /></svg>
+                            <span>Visualizar Cortes</span>
+                        </button>
+                        <button id="addToQueueBtn" class="btn btn-secondary">
+                            <svg class="icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 12h16.5m-16.5 3.75h16.5M3.75 19.5h16.5M5.625 4.5h12.75a1.875 1.875 0 010 3.75H5.625a1.875 1.875 0 010-3.75z" /></svg>
+                            <span>Añadir a la Cola</span>
+                        </button>
+                    </div>
+                    
+                    <div id="globalDownloadContainer"></div>
+                </div>
+            </div>
+        </aside>
+
+        <main class="results-canvas">
+            <div class="results-tabs">
+                <button class="tab-btn active" data-tab="visual">Resultados Visuales</button>
+                <button class="tab-btn" data-tab="queue">Cola de Procesamiento</button>
+            </div>
+            <div class="tab-content">
+                <div id="visualContent" class="tab-pane active">
+                    <div id="resultsInitialState">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 3.75v4.5m0-4.5h4.5m-4.5 0L9 9M3.75 20.25v-4.5m0 4.5h4.5m-4.5 0L9 15M20.25 3.75h-4.5m4.5 0v4.5m0-4.5L15 9m5.25 11.25h-4.5m4.5 0v-4.5m0 4.5L15 15" /></svg>
+                        <h2>Tus cortes aparecerán aquí</h2>
+                    </div>
+                    <div id="resultsContainer"></div>
+                </div>
+                <div id="queueContent" class="tab-pane">
+                    <div id="queueActions">
+                        <button id="clearCompletedBtn" class="btn btn-danger" style="width: auto;" disabled>
+                            <svg class="icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.134-2.036-2.134H8.718c-1.126 0-2.037.955-2.037 2.134v.916m7.5 0a48.667 48.667 0 00-7.5 0" /></svg>
+                            <span>Limpiar Completados</span>
+                        </button>
+                        <button id="downloadAllCompletedBtn" class="btn btn-primary" style="width: auto;" disabled>
+                            <svg class="icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" /></svg>
+                            <span id="downloadAllBtnText">Descargar Todo lo Completado</span>
+                        </button>
+                    </div>
+                    <div id="queueContainer"></div>
+                </div>
+            </div>
+        </main>
+    </div>
+    
+    <!-- INICIO DE MODALES -->
+    <div id="galleryModal" class="modal"><span class="modal-close">&times;</span><div class="modal-content"><img id="modalImage"><p id="modalCounter"></p></div><a class="modal-nav" id="modalPrev">&#10094;</a><a class="modal-nav" id="modalNext">&#10095;</a></div>
+    <div id="placementModal" class="modal"><div class="modal-content-wrapper"><span class="modal-close">&times;</span><button id="downloadPlacementBtn" class="btn btn-primary">Descargar JPG</button><div class="modal-content"><div id="placementGrid"></div></div></div></div>
+    
+    <div id="layoutSelectionModal" class="modal">
+        <div class="modal-content">
+            <span class="modal-close">&times;</span>
+            <h2>Seleccionar Disposición</h2>
+            <p>Elige cómo quieres organizar las piezas en la rejilla de colocación.</p>
+            <div id="layoutOptionsContainer">
+                <!-- Los botones de opciones se generarán aquí dinámicamente -->
+            </div>
+        </div>
+    </div>
+
+    <div id="helpModal" class="modal">
+        <div class="modal-content">
+            <span class="modal-close">&times;</span>
+            <h2>¿Cómo funciona Pamesa Master Cutt?</h2>
+            <p>Esta herramienta está diseñada para simular digitalmente los cortes de una matriz cerámica (la pieza grande original) en formatos comerciales más pequeños. Te permite visualizar el resultado y descargar todas las piezas para tus presentaciones.</p>
+            <p>Sigue estos sencillos pasos:</p>
+            <ol>
+                <li><strong>Elige tu Flujo de Trabajo</strong><p>Selecciona si vas a procesar <strong>Placas Cerámicas</strong>, <strong>Lamas de Madera</strong> o si prefieres un <strong>Corte Personalizado</strong>. La interfaz se adaptará para mostrarte solo las opciones relevantes.</p></li>
+                <li><strong>Sube tus Imágenes Base (Matrices)</strong><p>Haz clic o arrastra tus archivos de imagen a la zona de carga.<br>Para <strong>cerámica</strong>, puedes subir la vertical (aprox. 3402x7937px) o la cuadrada de 120x120cm (3400x3400px).<br>Para <strong>madera</strong>, sube la matriz de 120x60cm (3400x1700px).<br>Para <strong>personalizado</strong>, puedes subir una imagen de cualquier tamaño.</p></li>
+                <li><strong>Nombra tus Archivos</strong><p>Introduce un "Nombre Base" para identificar tu producto o proyecto (ej: <code>CORE-TAUPE</code>).<br>Este nombre se usará como prefijo para todos los archivos generados, facilitando su organización. Por ejemplo: <code>CORE-TAUPE-60x120-01.jpg</code>.</p></li>
+                <li><strong>Selecciona las Etapas de Corte</strong><p>Para cerámica o madera, marca las casillas de los cortes que deseas generar.<br>Para <strong>personalizado</strong>, introduce el ancho y alto deseado. Luego, elige el "Modo de Extracción":<br><strong>- Pieza Única:</strong> Corta una sola pieza desde la esquina superior izquierda.<br><strong>- Múltiples Piezas:</strong> Extrae todas las piezas posibles de la imagen. Puedes marcar la casilla para permitir que el programa rote el formato 90° si así se obtienen más piezas.</p></li>
+                <li><strong>Procesa y Obtén los Resultados</strong><p>Elige tu modo de trabajo:<br><strong>Visualizar Cortes:</strong> Genera los cortes en tiempo real en el panel derecho para una vista previa inmediata.<br><strong>Añadir a la Cola:</strong> Prepara un trabajo para procesar en segundo plano, ideal para grandes lotes de imágenes. El panel se limpiará para que puedas añadir más trabajos.</p></li>
+                <li><strong>Visualiza y Descarga</strong><p><strong>Resultados Visuales:</strong><br><em>Ver Colocación:</em> Crea un mosaico aleatorio para apreciar la variación del diseño. Ahora puedes elegir la disposición de la rejilla (ej. 3x2, 2x3).<br><em>Descargar Formato:</em> Descarga un .zip con las piezas de ese formato.<br><em>Descargar Todo:</em> Descarga todos los cortes generados en un único .zip.<br><strong>Cola de Procesamiento:</strong><br>Una vez un trabajo está "Completado", aparecerá un botón para descargar el .zip individual. Adicionalmente, el botón "Descargar Todo lo Completado" se activará para descargar un único ZIP con todos los trabajos finalizados.</p></li>
+            </ol>
+            <div class="modal-footer"><button id="closeHelpModalBtn" class="btn btn-secondary">Entendido</button></div>
+        </div>
+    </div>
+    <!-- FIN DE MODALES -->
+
+    <!-- NOTIFICACIÓN -->
+    <div id="notificationToast" class="notification-toast">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+        <span id="notificationMessage"></span>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const VISUAL_SCALE_FACTOR = 1.5;
+            const PIECE_APPEARANCE_DELAY = 50;
+
+            const REQUIRED_WIDTH = 3400;
+            const REQUIRED_HEIGHT = 3400;
+            const TALL_MATRIX_WIDTH = 3402;
+            const TALL_MATRIX_HEIGHT = 7937;
+            const WOOD_MATRIX_WIDTH = 3400;
+            const WOOD_MATRIX_HEIGHT = 1700;
+            const DIMENSION_TOLERANCE = 20;
+            const PIXELS_PER_CM = 3400 / 120; // ~28.33 pixels por cm, basado en el estándar de 120cm
+    
+            const cuttingStages = [
+                { id: 'stage1', name: 'Corte 1: 120x120cm → 60x120cm', inputWidth: 3400, inputHeight: 3400, cutDirection: 'vertical', pieces: 2, outputNamePrefix: '60x120', type: 'ceramic' },
+                { id: 'stage2', name: 'Corte 2: 60x120cm → 60x60cm', inputWidth: 1700, inputHeight: 3400, cutDirection: 'horizontal', pieces: 2, outputNamePrefix: '60x60', type: 'ceramic' },
+                { id: 'stage3', name: 'Corte 3: 60x60cm → 30x60cm', inputWidth: 1700, inputHeight: 1700, cutDirection: 'vertical', pieces: 2, outputNamePrefix: '30x60', type: 'ceramic' },
+                { id: 'stageWood', name: 'Corte Madera: 120x60cm → 120x20cm (x3)', inputWidth: 3400, inputHeight: 1700, cutDirection: 'horizontal', pieces: 3, outputNamePrefix: '120x20-madera', type: 'wood' }
+            ];
+    
+            // DOM Elements
+            const mainSubtitle = document.getElementById('mainSubtitle');
+            const workflowSelection = document.getElementById('workflowSelection');
+            const processingInterface = document.getElementById('processingInterface');
+            const selectCeramicBtn = document.getElementById('selectCeramicBtn');
+            const selectWoodBtn = document.getElementById('selectWoodBtn');
+            const selectCustomBtn = document.getElementById('selectCustomBtn');
+            const ceramicCuttingOptions = document.getElementById('ceramicCuttingOptions');
+            const woodCuttingOptions = document.getElementById('woodCuttingOptions');
+            const customCuttingOptions = document.getElementById('customCuttingOptions');
+            const customWidthInput = document.getElementById('customWidth');
+            const customHeightInput = document.getElementById('customHeight');
+            const rotationOptionContainer = document.getElementById('rotationOptionContainer');
+            const uploadTextMain = document.getElementById('uploadTextMain');
+
+            const imageLoader = document.getElementById('imageLoader');
+            const processVisualBtn = document.getElementById('processVisualBtn');
+            const addToQueueBtn = document.getElementById('addToQueueBtn');
+            const downloadAllCompletedBtn = document.getElementById('downloadAllCompletedBtn');
+            const downloadAllBtnText = document.getElementById('downloadAllBtnText');
+            const clearCompletedBtn = document.getElementById('clearCompletedBtn');
+            const optionsContainer = document.getElementById('cuttingOptions');
+            const resultsContainer = document.getElementById('resultsContainer');
+            const queueContainer = document.getElementById('queueContainer');
+            const globalDownloadContainer = document.getElementById('globalDownloadContainer');
+            const baseNameInput = document.getElementById('baseNameInput');
+            const uploadArea = document.getElementById('upload-area'); 
+            const previewContainer = document.getElementById('previewContainer');
+            const controlPanel = document.getElementById('controlPanel');
+            const resultsInitialState = document.getElementById('resultsInitialState');
+            const tabs = document.querySelectorAll('.tab-btn');
+            const tabPanes = document.querySelectorAll('.tab-pane');
+            const galleryModal = document.getElementById('galleryModal');
+            const modalImage = document.getElementById('modalImage');
+            const modalCounter = document.getElementById('modalCounter');
+            const modalPrev = document.getElementById('modalPrev');
+            const modalNext = document.getElementById('modalNext');
+            const placementModal = document.getElementById('placementModal');
+            const placementGrid = document.getElementById('placementGrid');
+            const downloadPlacementBtn = document.getElementById('downloadPlacementBtn');
+            const helpBtn = document.getElementById('helpBtn');
+            const helpModal = document.getElementById('helpModal');
+            const closeHelpModalBtn = document.getElementById('closeHelpModalBtn');
+            const layoutSelectionModal = document.getElementById('layoutSelectionModal');
+            const newCutBtn = document.getElementById('newCutBtn'); 
+            const enterBtn = document.getElementById('enterAppBtn');
+            const welcomeScreen = document.getElementById('welcomeScreen');
+            const appLayout = document.querySelector('.app-layout');
+            const notificationToast = document.getElementById('notificationToast');
+            const notificationMessage = document.getElementById('notificationMessage');
+            
+            // State
+            let currentWorkflow = null;
+            const fileStore = new Map();
+            let fileCounter = 0;
+            let currentGallery = [];
+            let currentIndex = 0;
+            let galleries = {}; 
+            let notificationTimeout;
+            let jobQueue = [];
+            let isQueueProcessing = false;
+    
+            // --- INICIALIZACIÓN ---
+            populateOptions();
+            setupEventListeners();
+            
+            function setupEventListeners() {
+                enterBtn.addEventListener('click', () => {
+                    welcomeScreen.style.opacity = '0';
+                    setTimeout(() => {
+                        welcomeScreen.style.display = 'none';
+                        appLayout.style.display = 'flex';
+                    }, 500);
+                });
+
+                selectCeramicBtn.addEventListener('click', () => showProcessingInterface('ceramic'));
+                selectWoodBtn.addEventListener('click', () => showProcessingInterface('wood'));
+                selectCustomBtn.addEventListener('click', () => showProcessingInterface('custom'));
+                
+                document.querySelectorAll('input[name="extractionMode"]').forEach(radio => {
+                    radio.addEventListener('change', (e) => {
+                        rotationOptionContainer.style.display = e.target.value === 'tiling' ? 'block' : 'none';
+                    });
+                });
+
+                uploadArea.addEventListener('dragover', (e) => { e.preventDefault(); uploadArea.classList.add('drag-over'); });
+                uploadArea.addEventListener('dragleave', () => uploadArea.classList.remove('drag-over'));
+                uploadArea.addEventListener('drop', (e) => { e.preventDefault(); uploadArea.classList.remove('drag-over'); if (e.dataTransfer.files.length) handleFiles(e.dataTransfer.files); });
+                imageLoader.addEventListener('change', () => { if (imageLoader.files.length) handleFiles(imageLoader.files); });
+                
+                newCutBtn.addEventListener('click', () => {
+                    if (window.confirm('¿Estás seguro de que quieres limpiar todo y empezar de nuevo? Se perderán las imágenes cargadas, los resultados actuales y volverás a la pantalla de selección.')) {
+                        resetApplication();
+                    }
+                });
+                
+                processVisualBtn.addEventListener('click', handleProcessVisualClick);
+                addToQueueBtn.addEventListener('click', handleAddToQueueClick);
+                downloadAllCompletedBtn.addEventListener('click', handleDownloadAllCompleted);
+                clearCompletedBtn.addEventListener('click', handleClearCompleted);
+    
+                queueContainer.addEventListener('click', (e) => {
+                    const target = e.target.closest('button');
+                    if (!target) return;
+                    const jobItem = target.closest('.queue-item');
+                    const jobId = parseInt(jobItem.dataset.jobId, 10);
+                    
+                    if (target.classList.contains('download-job-zip-btn')) {
+                        handleDownloadSingleJob(jobId);
+                    } else if (target.classList.contains('delete-job-btn')) {
+                        handleDeleteJob(jobId);
+                    } else if (target.classList.contains('cancel-job-btn')) {
+                        handleCancelJob(jobId);
+                    }
+                });
+    
+                tabs.forEach(tab => {
+                    tab.addEventListener('click', () => {
+                        tabs.forEach(t => t.classList.remove('active'));
+                        tab.classList.add('active');
+                        tabPanes.forEach(pane => {
+                            pane.classList.remove('active');
+                            if (pane.id === `${tab.dataset.tab}Content`) {
+                                pane.classList.add('active');
+                            }
+                        });
+                    });
+                });
+    
+                // Modal listeners
+                helpBtn.addEventListener('click', openHelpModal);
+                helpModal.addEventListener('click', (e) => { if (e.target === helpModal) closeHelpModal(); });
+                closeHelpModalBtn.addEventListener('click', closeHelpModal);
+                layoutSelectionModal.addEventListener('click', (e) => { if (e.target === layoutSelectionModal) closeLayoutSelectionModal(); });
+                document.querySelectorAll('.modal-close').forEach(btn => btn.addEventListener('click', () => { closeAllModals(); }));
+                galleryModal.addEventListener('click', (e) => { if (e.target === galleryModal) closeGalleryModal(); });
+                placementModal.addEventListener('click', (e) => { if (e.target.closest('.modal-content-wrapper') === null || e.target.matches('.modal-close')) closePlacementModal(); });
+                document.addEventListener('keydown', (e) => { if (e.key === 'Escape') { closeAllModals(); } if (galleryModal.style.display === 'flex') { if (e.key === 'ArrowLeft') modalPrev.click(); if (e.key === 'ArrowRight') modalNext.click(); } });
+                modalPrev.addEventListener('click', () => { if (currentIndex > 0) showGalleryImage(--currentIndex); });
+                modalNext.addEventListener('click', () => { if (currentIndex < currentGallery.length - 1) showGalleryImage(++currentIndex); });
+                resultsContainer.addEventListener('click', handleResultsContainerClick);
+                downloadPlacementBtn.addEventListener('click', handleDownloadPlacement);
+            }
+
+            function showProcessingInterface(workflow) {
+                currentWorkflow = workflow;
+
+                workflowSelection.style.display = 'none';
+                processingInterface.style.display = 'block';
+                
+                ceramicCuttingOptions.style.display = 'none';
+                woodCuttingOptions.style.display = 'none';
+                customCuttingOptions.style.display = 'none';
+
+                if (workflow === 'ceramic') {
+                    mainSubtitle.innerHTML = 'Sube tus imágenes base de <strong>placas cerámicas</strong>. Se ajustarán a 3400x3400px.';
+                    uploadTextMain.textContent = 'Arrastra tus placas (120x120 o 120x280)';
+                    ceramicCuttingOptions.style.display = 'block';
+                } else if (workflow === 'wood') {
+                    mainSubtitle.innerHTML = 'Sube tus imágenes base de <strong>lamas de madera</strong> (120x60cm).';
+                    uploadTextMain.textContent = 'Arrastra tus lamas de madera';
+                    woodCuttingOptions.style.display = 'block';
+                } else if (workflow === 'custom') {
+                    mainSubtitle.innerHTML = 'Sube cualquier imagen para aplicar un <strong>corte personalizado</strong>.';
+                    uploadTextMain.textContent = 'Arrastra tus imágenes de origen';
+                    customCuttingOptions.style.display = 'block';
+                }
+            }
+
+            function areDimensionsClose(imgWidth, imgHeight, targetWidth, targetHeight, tolerance) {
+                return Math.abs(imgWidth - targetWidth) <= tolerance && Math.abs(imgHeight - targetHeight) <= tolerance;
+            }
+
+            function handleFiles(files) {
+                for (const file of files) {
+                    const reader = new FileReader();
+                    reader.onload = async (e) => {
+                        const originalImg = new Image();
+                        originalImg.onload = async () => {
+                            const originalFileId = `${file.name}-${file.lastModified}-${++fileCounter}`;
+                            const fileGroup = new Map();
+                            fileStore.set(originalFileId, fileGroup);
+                            
+                            const baseFileName = file.name.substring(0, file.name.lastIndexOf('.')) || file.name;
+                             if (baseNameInput.value.trim() === '') {
+                                const extractedName = extractBaseNameFromFile(file.name);
+                                if (extractedName) baseNameInput.value = extractedName;
+                            }
+
+                            // Para los flujos de cerámica y madera, se mantiene la lógica de clasificación y redimensionado
+                            if (currentWorkflow === 'ceramic') {
+                                if (areDimensionsClose(originalImg.width, originalImg.height, TALL_MATRIX_WIDTH, TALL_MATRIX_HEIGHT, DIMENSION_TOLERANCE)) {
+                                    showNotification(`Matriz 120x280cm detectada. Generando 2 piezas...`);
+                                    const sourceBlob = await fetch(e.target.result).then(res => res.blob());
+                                    fileGroup.set('source', { file: new File([sourceBlob], file.name, {type: file.type}), dataURL: e.target.result, type: 'tall' });
+                                    
+                                    const { file: file1, dataURL: dataURL1 } = await processSubPiece(originalImg, 0, TALL_MATRIX_WIDTH, `${baseFileName}_p1.jpg`);
+                                    fileGroup.set('generated_1', { file: file1, dataURL: dataURL1, type: 'square' });
+                                    addPreview(originalFileId, 'generated_1', dataURL1);
+
+                                    const { file: file2, dataURL: dataURL2 } = await processSubPiece(originalImg, TALL_MATRIX_WIDTH, TALL_MATRIX_WIDTH, `${baseFileName}_p2.jpg`);
+                                    fileGroup.set('generated_2', { file: file2, dataURL: dataURL2, type: 'square' });
+                                    addPreview(originalFileId, 'generated_2', dataURL2);
+                                } else {
+                                    let finalFile, finalDataURL;
+                                    const targetWidth = REQUIRED_WIDTH; const targetHeight = REQUIRED_HEIGHT;
+                                    if (areDimensionsClose(originalImg.width, originalImg.height, targetWidth, targetHeight, DIMENSION_TOLERANCE)) {
+                                        finalDataURL = e.target.result;
+                                        const sourceBlob = await fetch(finalDataURL).then(res => res.blob());
+                                        finalFile = new File([sourceBlob], file.name, {type: file.type});
+                                    } else {
+                                        showNotification(`Ajustando imagen a ${targetWidth}x${targetHeight}px.`, 'info');
+                                        const canvas = document.createElement('canvas');
+                                        canvas.width = targetWidth; canvas.height = targetHeight;
+                                        const ctx = canvas.getContext('2d');
+                                        ctx.drawImage(originalImg, 0, 0, targetWidth, targetHeight);
+                                        finalDataURL = canvas.toDataURL('image/jpeg', 1.0);
+                                        const resizedBlob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', 1.0));
+                                        finalFile = new File([resizedBlob], file.name, { type: 'image/jpeg' });
+                                    }
+                                    fileGroup.set('source', { file: finalFile, dataURL: finalDataURL, type: 'square' });
+                                    addPreview(originalFileId, 'source', finalDataURL);
+                                }
+                            } else if (currentWorkflow === 'wood' && areDimensionsClose(originalImg.width, originalImg.height, WOOD_MATRIX_WIDTH, WOOD_MATRIX_HEIGHT, DIMENSION_TOLERANCE)) {
+                                showNotification(`Matriz de madera 120x60cm detectada.`);
+                                const sourceBlob = await fetch(e.target.result).then(res => res.blob());
+                                fileGroup.set('source', { file: new File([sourceBlob], file.name, {type: file.type}), dataURL: e.target.result, type: 'wood' });
+                                addPreview(originalFileId, 'source', e.target.result);
+                            } else {
+                                // Para flujo personalizado (o si no coincide en los otros), simplemente aceptamos la imagen tal cual
+                                const sourceBlob = await fetch(e.target.result).then(res => res.blob());
+                                const finalFile = new File([sourceBlob], file.name, {type: file.type});
+                                fileGroup.set('source', { file: finalFile, dataURL: e.target.result, type: 'custom_source' });
+                                addPreview(originalFileId, 'source', e.target.result);
+                            }
+                        };
+                        originalImg.src = e.target.result;
+                    };
+                    reader.readAsDataURL(file);
+                }
+                imageLoader.value = '';
+            }
+            
+            async function processSubPiece(image, sy, sh, newFileName) {
+                const canvas = document.createElement('canvas');
+                canvas.width = REQUIRED_WIDTH;
+                canvas.height = REQUIRED_HEIGHT;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(image, 0, sy, TALL_MATRIX_WIDTH, sh, 0, 0, REQUIRED_WIDTH, REQUIRED_HEIGHT);
+                const dataURL = canvas.toDataURL('image/jpeg', 1.0);
+                const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', 1.0));
+                const file = new File([blob], newFileName, { type: 'image/jpeg' });
+                return { file, dataURL };
+            }
+
+            function addPreview(originalFileId, subFileId, src) {
+                const previewItem = document.createElement('div');
+                previewItem.className = 'preview-item';
+                previewItem.dataset.originalFileId = originalFileId;
+                previewItem.dataset.subFileId = subFileId;
+                
+                previewItem.innerHTML = `<span class="remove-btn">&times;</span><img src="${src}">`;
+                previewContainer.appendChild(previewItem);
+                
+                previewItem.querySelector('.remove-btn').addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    const group = fileStore.get(originalFileId);
+                    if (group && group.get('source').type === 'tall') {
+                        fileStore.delete(originalFileId);
+                        document.querySelectorAll(`.preview-item[data-original-file-id="${originalFileId}"]`).forEach(el => el.remove());
+                    } else {
+                        fileStore.delete(originalFileId);
+                        previewItem.remove();
+                    }
+                });
+            }
+    
+            async function handleProcessVisualClick() {
+                const rawBaseName = baseNameInput.value.trim();
+                const baseName = rawBaseName && !rawBaseName.endsWith('-') ? `${rawBaseName}-` : rawBaseName;
+                const nameCounters = {};
+                const allGeneratedPieces = {};
+                const allSourceImages = {};
+                
+                setVisualProcessingState(true);
+
+                if (currentWorkflow === 'ceramic') {
+                    const selectedStageIds = Array.from(ceramicCuttingOptions.querySelectorAll('input:checked')).map(cb => cb.dataset.stageid);
+                    const squareFiles = getAllFilesFromStore('square');
+                    
+                    if (squareFiles.length === 0) { showNotification('Por favor, selecciona al menos una imagen de cerámica.', 'error'); setVisualProcessingState(false); return; }
+                    if (selectedStageIds.length === 0) { showNotification('Por favor, selecciona al menos una etapa de corte.', 'error'); setVisualProcessingState(false); return; }
+
+                    const allTallFiles = getAllFilesFromStore('tall');
+                    if (allTallFiles.length > 0) {
+                        resultsContainer.insertAdjacentHTML('beforeend', createFormatGroupHTML('120x280', 'Matrices Verticales', baseName, allTallFiles.length, true, false));
+                        const tallGroup = document.getElementById('format-group-120x280');
+                        galleries['120x280'] = [];
+                        const tallPiecesToRender = allTallFiles.map((fileData, index) => {
+                            const pieceName = `${baseName}120x280-${String(index + 1).padStart(2, '0')}`;
+                            return { ...fileData, blob: fileData.file, name: pieceName, url: URL.createObjectURL(fileData.file) };
+                        });
+                        galleries['120x280'] = tallPiecesToRender;
+                        await renderPiecesSequentially(tallPiecesToRender, tallGroup, 0);
+                        tallGroup.classList.add('completed');
+                        tallGroup.querySelector('.format-status-text').textContent = 'Completado';
+                        allSourceImages.tall = allTallFiles;
+                    }
+
+                    const sourceImages = squareFiles.map(item => ({ blob: item.file, name: item.file.name, url: URL.createObjectURL(item.file), dataURL: item.dataURL }));
+                    resultsContainer.insertAdjacentHTML('beforeend', createFormatGroupHTML('120x120', 'Matrices 120x120cm', baseName, sourceImages.length, true, true));
+                    const sourceGroup = document.getElementById('format-group-120x120');
+                    galleries['120x120'] = sourceImages;
+                    await renderPiecesSequentially(sourceImages.map((img, index) => ({...img, name: String(index + 1).padStart(2, '0')})), sourceGroup, 0);
+                    sourceGroup.classList.add('completed');
+                    sourceGroup.querySelector('.format-status-text').textContent = 'Completado';
+                    allSourceImages.square = sourceImages;
+
+                    let piecesInStage = sourceImages.length;
+                    selectedStageIds.forEach(stageId => {
+                        const stage = cuttingStages.find(s => s.id === stageId);
+                        piecesInStage *= stage.pieces;
+                        resultsContainer.insertAdjacentHTML('beforeend', createFormatGroupHTML(stage.outputNamePrefix, 'Cortes Generados', baseName, piecesInStage, false, true));
+                    });
+        
+                    let imagesForNextStage = sourceImages.map(img => img.blob);
+                    for (const stageId of selectedStageIds) {
+                        const stage = cuttingStages.find(s => s.id === stageId);
+                        const format = stage.outputNamePrefix;
+                        const stagePlaceholder = document.getElementById(`format-group-${format}`);
+                        const statusTextEl = stagePlaceholder.querySelector('.format-status-text');
+                        
+                        const currentStageInputImages = [...imagesForNextStage];
+                        const currentStageOutputBlobs = [];
+                        allGeneratedPieces[format] = [];
+                        if(!galleries[format]) galleries[format] = [];
+
+                        for (let i = 0; i < currentStageInputImages.length; i++) {
+                            statusTextEl.textContent = `Cortando ${i + 1} de ${currentStageInputImages.length}...`;
+                            const img = await createImageFromBlob(currentStageInputImages[i]);
+                            
+                            if (areDimensionsClose(img.width, img.height, stage.inputWidth, stage.inputHeight, DIMENSION_TOLERANCE)) {
+                                const startIndex = galleries[format].length; 
+                                const croppedPieces = await performCut(img, stage, baseName, nameCounters);
+                                allGeneratedPieces[format].push(...croppedPieces);
+                                galleries[format].push(...croppedPieces);
+                                currentStageOutputBlobs.push(...croppedPieces.map(p => p.blob));
+                                await renderPiecesSequentially(croppedPieces, stagePlaceholder, startIndex); 
+                            }
+                        }
+                        imagesForNextStage = currentStageOutputBlobs;
+                        statusTextEl.textContent = 'Completado';
+                        stagePlaceholder.classList.remove('processing');
+                        stagePlaceholder.classList.add('completed');
+                    }
+                } else if (currentWorkflow === 'wood') {
+                    const selectedStageIds = Array.from(woodCuttingOptions.querySelectorAll('input:checked')).map(cb => cb.dataset.stageid);
+                    const woodFiles = getAllFilesFromStore('wood');
+
+                    if (woodFiles.length === 0) { showNotification('Por favor, selecciona al menos una imagen de madera.', 'error'); setVisualProcessingState(false); return; }
+                    if (selectedStageIds.length === 0) { showNotification('Por favor, selecciona al menos una etapa de corte.', 'error'); setVisualProcessingState(false); return; }
+                    
+                    const stage = cuttingStages.find(s => s.id === selectedStageIds[0]);
+                    const format = stage.outputNamePrefix;
+                    const sourceWoodImages = woodFiles.map(item => ({ blob: item.file, name: item.file.name, url: URL.createObjectURL(item.file), dataURL: item.dataURL }));
+                    
+                    resultsContainer.insertAdjacentHTML('beforeend', createFormatGroupHTML(format, 'Cortes Madera', baseName, sourceWoodImages.length * stage.pieces, false, true));
+                    const stagePlaceholder = document.getElementById(`format-group-${format}`);
+                    const statusTextEl = stagePlaceholder.querySelector('.format-status-text');
+                    allGeneratedPieces[format] = [];
+                    if(!galleries[format]) galleries[format] = [];
+
+                    for (let i = 0; i < sourceWoodImages.length; i++) {
+                        statusTextEl.textContent = `Cortando madera ${i + 1} de ${sourceWoodImages.length}...`;
+                        const img = await createImageFromBlob(sourceWoodImages[i].blob);
+                        if (areDimensionsClose(img.width, img.height, stage.inputWidth, stage.inputHeight, DIMENSION_TOLERANCE)) {
+                             const startIndex = galleries[format].length; 
+                             const croppedPieces = await performWoodCut(img, stage, baseName, nameCounters);
+                             allGeneratedPieces[format].push(...croppedPieces);
+                             galleries[format].push(...croppedPieces);
+                             await renderPiecesSequentially(croppedPieces, stagePlaceholder, startIndex); 
+                        }
+                    }
+                    statusTextEl.textContent = 'Completado';
+                    stagePlaceholder.classList.remove('processing');
+                    stagePlaceholder.classList.add('completed');
+                } else if (currentWorkflow === 'custom') {
+                    const customWidth = parseFloat(customWidthInput.value);
+                    const customHeight = parseFloat(customHeightInput.value);
+                    const extractionMode = document.querySelector('input[name="extractionMode"]:checked').value;
+                    const allowRotation = document.getElementById('allowRotation').checked;
+
+                    if (isNaN(customWidth) || isNaN(customHeight) || customWidth <= 0 || customHeight <= 0) {
+                        showNotification('Por favor, introduce un ancho y alto válidos en cm.', 'error');
+                        setVisualProcessingState(false); return;
+                    }
+
+                    const sourceFiles = getAllFilesFromStore('custom_source');
+                    if (sourceFiles.length === 0) {
+                        showNotification('Por favor, sube al menos una imagen para cortar.', 'error');
+                        setVisualProcessingState(false); return;
+                    }
+
+                    for (const [i, fileData] of sourceFiles.entries()) {
+                        const img = await createImageFromBlob(fileData.file);
+                        let finalPieces = [];
+                        let format = `${customWidth}x${customHeight}`;
+                        let totalPiecesInImage = 0;
+
+                        if (extractionMode === 'single') {
+                            const outputWidthPx = Math.round(customWidth * PIXELS_PER_CM);
+                            const outputHeightPx = Math.round(customHeight * PIXELS_PER_CM);
+                            if (img.width < outputWidthPx || img.height < outputHeightPx) {
+                                showNotification(`Error: El corte ${format}cm es más grande que la imagen original "${fileData.file.name}".`, 'error');
+                                continue;
+                            }
+                            totalPiecesInImage = 1;
+                            finalPieces = await performSingleCustomCut(img, outputWidthPx, outputHeightPx, format, baseName, nameCounters);
+                        } else { // Tiling mode
+                            const { pieces, optimalFormat, count } = await performTilingCustomCut(img, customWidth, customHeight, allowRotation, baseName, nameCounters);
+                            finalPieces = pieces;
+                            format = optimalFormat; // Actualizamos el formato al óptimo (podría estar rotado)
+                            totalPiecesInImage = count;
+                        }
+
+                        if (totalPiecesInImage > 0) {
+                             if (!allGeneratedPieces[format]) {
+                                allGeneratedPieces[format] = [];
+                                galleries[format] = [];
+                                // Calcular el total de piezas esperadas para este formato
+                                let totalExpectedPieces = 0;
+                                for(const sf of sourceFiles){
+                                    const tempImg = await createImageFromBlob(sf.file);
+                                    const { count } = await performTilingCustomCut(tempImg, customWidth, customHeight, allowRotation, '', {}); // Simulación para contar
+                                    totalExpectedPieces += count;
+                                }
+                                resultsContainer.insertAdjacentHTML('beforeend', createFormatGroupHTML(format, 'Corte Personalizado', baseName, totalExpectedPieces, false, true));
+                            }
+
+                            const stagePlaceholder = document.getElementById(`format-group-${format}`);
+                            const statusTextEl = stagePlaceholder.querySelector('.format-status-text');
+                            statusTextEl.textContent = `Procesando imagen ${i + 1} de ${sourceFiles.length}...`;
+                            
+                            const startIndex = galleries[format].length;
+                            allGeneratedPieces[format].push(...finalPieces);
+                            galleries[format].push(...finalPieces);
+                            await renderPiecesSequentially(finalPieces, stagePlaceholder, startIndex);
+                        }
+                    }
+
+                    // Marcar todos los grupos como completados al final
+                    Object.keys(allGeneratedPieces).forEach(format => {
+                        const stagePlaceholder = document.getElementById(`format-group-${format}`);
+                        if (stagePlaceholder && !stagePlaceholder.classList.contains('completed')) {
+                            stagePlaceholder.querySelector('.format-status-text').textContent = 'Completado';
+                            stagePlaceholder.classList.remove('processing');
+                            stagePlaceholder.classList.add('completed');
+                        }
+                    });
+                }
+                
+                setVisualProcessingState(false);
+                generateGlobalDownloadButtons(allSourceImages, allGeneratedPieces, baseName);
+            }
+            
+            function setVisualProcessingState(isProcessing) {
+                controlPanel.classList.toggle('is-processing', isProcessing);
+                processVisualBtn.disabled = isProcessing;
+                addToQueueBtn.disabled = isProcessing;
+    
+                if (isProcessing) {
+                    processVisualBtn.querySelector('span').textContent = 'Procesando...';
+                    processVisualBtn.insertAdjacentHTML('afterbegin', '<span class="spinner"></span>');
+                    resultsInitialState.style.opacity = '0';
+                    resultsInitialState.style.display = 'none';
+                    globalDownloadContainer.innerHTML = '';
+                    resultsContainer.innerHTML = '';
+                    Object.keys(galleries).forEach(key => {
+                        if (galleries[key]) {
+                            galleries[key].forEach(item => {
+                                if (item.url) URL.revokeObjectURL(item.url);
+                            });
+                        }
+                    });
+                    galleries = {};
+                } else {
+                    const spinner = processVisualBtn.querySelector('span.spinner');
+                    if (spinner) spinner.remove();
+                    processVisualBtn.querySelector('span').textContent = "Visualizar Cortes";
+                }
+            }
+            
+            function handleAddToQueueClick() {
+                const baseName = baseNameInput.value.trim();
+                if (!baseName) { showNotification('Por favor, introduce un nombre base para el trabajo.', 'error'); return; }
+
+                let jobFiles, selectedStageIds, customOptions = {};
+                
+                if (currentWorkflow === 'ceramic') {
+                    jobFiles = { square: getAllFilesFromStore('square'), tall: getAllFilesFromStore('tall') };
+                    selectedStageIds = Array.from(ceramicCuttingOptions.querySelectorAll('input:checked')).map(cb => cb.dataset.stageid);
+                    if (jobFiles.square.length === 0) { showNotification('Por favor, selecciona al menos una imagen para la cola.', 'error'); return; }
+                    if (selectedStageIds.length === 0) { showNotification('Por favor, selecciona al menos una etapa de corte.', 'error'); return; }
+                } else if (currentWorkflow === 'wood') {
+                    jobFiles = { wood: getAllFilesFromStore('wood') };
+                    selectedStageIds = Array.from(woodCuttingOptions.querySelectorAll('input:checked')).map(cb => cb.dataset.stageid);
+                    if (jobFiles.wood.length === 0) { showNotification('Por favor, selecciona al menos una imagen para la cola.', 'error'); return; }
+                    if (selectedStageIds.length === 0) { showNotification('Por favor, selecciona una etapa de corte.', 'error'); return; }
+                } else if (currentWorkflow === 'custom') {
+                    jobFiles = { custom_source: getAllFilesFromStore('custom_source') };
+                    const customWidth = parseFloat(customWidthInput.value);
+                    const customHeight = parseFloat(customHeightInput.value);
+                    if (isNaN(customWidth) || isNaN(customHeight) || customWidth <= 0 || customHeight <= 0) {
+                        showNotification('Introduce un ancho y alto válidos para añadir a la cola.', 'error'); return;
+                    }
+                    if (jobFiles.custom_source.length === 0) { showNotification('Sube al menos una imagen para la cola.', 'error'); return; }
+                    customOptions = { 
+                        width: customWidth, 
+                        height: customHeight,
+                        extractionMode: document.querySelector('input[name="extractionMode"]:checked').value,
+                        allowRotation: document.getElementById('allowRotation').checked
+                    };
+                    selectedStageIds = [];
+                }
+    
+                const jobId = Date.now();
+                const job = {
+                    id: jobId, baseName, files: jobFiles, selectedStageIds, workflow: currentWorkflow,
+                    customOptions, status: 'queued', zipBlob: null, fileList: null
+                };
+    
+                jobQueue.push(job);
+                renderJobInQueue(job);
+                clearFormControlPanel();
+                showNotification(`Trabajo "${baseName}" añadido a la cola.`);
+                
+                document.querySelector('.tab-btn[data-tab="queue"]').click();
+                processNextJobInQueue();
+            }
+    
+            async function processNextJobInQueue() {
+                if (isQueueProcessing) return;
+                const nextJob = jobQueue.find(job => job.status === 'queued');
+                if (!nextJob) return;
+    
+                isQueueProcessing = true;
+                nextJob.status = 'processing';
+                updateJobUI(nextJob);
+    
+                try {
+                    const { zipBlob, allFilesForZipping } = await executeJob(nextJob);
+                    nextJob.zipBlob = zipBlob;
+                    nextJob.fileList = allFilesForZipping;
+                    nextJob.status = 'completed';
+                    showNotification(`Trabajo "${nextJob.baseName}" completado.`, 'success');
+                } catch (error) {
+                    console.error(`Error procesando el trabajo ${nextJob.id}:`, error);
+                    nextJob.status = 'error';
+                    showNotification(`Error en el trabajo "${nextJob.baseName}".`, 'error');
+                } finally {
+                    updateJobUI(nextJob);
+                    isQueueProcessing = false;
+                    processNextJobInQueue();
+                }
+            }
+    
+            async function executeJob(job) {
+                const { files, selectedStageIds, baseName: rawBaseName, workflow, customOptions } = job;
+                const baseName = rawBaseName.endsWith('-') ? rawBaseName : `${rawBaseName}-`;
+                const nameCounters = {};
+                const allFilesForZipping = [];
+                const rootFolderName = rawBaseName.endsWith('-') ? rawBaseName.slice(0, -1) : (rawBaseName || 'Pamesa_Recortes_Cola');
+
+                let totalSteps = 0;
+                let stepsCompleted = 0;
+                const progressCallback = () => { stepsCompleted++; updateJobProgress(job.id, stepsCompleted, totalSteps); };
+
+                if (workflow === 'ceramic') {
+                    const { tall: tallFiles, square: squareFiles } = files;
+                    totalSteps += tallFiles.length + squareFiles.length;
+                    let piecesForNextStage = squareFiles.length;
+                    for (const stageId of selectedStageIds) { piecesForNextStage *= cuttingStages.find(s => s.id === stageId).pieces; totalSteps += piecesForNextStage; }
+                    
+                    for (const [index, fileData] of tallFiles.entries()) {
+                        const fileName = `${baseName}120x280-${String(index + 1).padStart(2, '0')}.jpg`;
+                        allFilesForZipping.push({ blob: fileData.file, path: `${rootFolderName}/${rootFolderName}-120x280/${fileName}` });
+                        progressCallback();
+                    }
+                    const sourceBlobsForCutting = [];
+                    for (const [index, fileData] of squareFiles.entries()) {
+                        const fileName = `${baseName}120x120-${String(index + 1).padStart(2, '0')}.jpg`;
+                        allFilesForZipping.push({ blob: fileData.file, path: `${rootFolderName}/${rootFolderName}-120x120/${fileName}` });
+                        sourceBlobsForCutting.push(fileData.file);
+                        progressCallback();
+                    }
+                    let imagesForNextStage = sourceBlobsForCutting;
+                    for (const stageId of selectedStageIds) {
+                        const stage = cuttingStages.find(s => s.id === stageId);
+                        const currentStageInputImages = [...imagesForNextStage];
+                        const currentStageOutputBlobs = [];
+                        const subfolderName = `${rootFolderName}-${stage.outputNamePrefix}`;
+                        for (const inputBlob of currentStageInputImages) {
+                            const img = await createImageFromBlob(inputBlob);
+                            if (areDimensionsClose(img.width, img.height, stage.inputWidth, stage.inputHeight, DIMENSION_TOLERANCE)) {
+                                const croppedPieces = await performCut(img, stage, baseName, nameCounters);
+                                for (const piece of croppedPieces) {
+                                    allFilesForZipping.push({ blob: piece.blob, path: `${rootFolderName}/${subfolderName}/${piece.name}.jpg` });
+                                    currentStageOutputBlobs.push(piece.blob);
+                                    progressCallback(); await delay(5);
+                                }
+                            }
+                        }
+                        imagesForNextStage = currentStageOutputBlobs;
+                    }
+                } else if (workflow === 'wood') {
+                    const { wood: woodFiles } = files;
+                    const stage = cuttingStages.find(s => s.id === selectedStageIds[0]);
+                    totalSteps += woodFiles.length * stage.pieces;
+                    const subfolderName = `${rootFolderName}-${stage.outputNamePrefix}`;
+                    for (const fileData of woodFiles) {
+                         const img = await createImageFromBlob(fileData.file);
+                         if (areDimensionsClose(img.width, img.height, stage.inputWidth, stage.inputHeight, DIMENSION_TOLERANCE)) {
+                             const croppedPieces = await performWoodCut(img, stage, baseName, nameCounters);
+                             for (const piece of croppedPieces) {
+                                 allFilesForZipping.push({ blob: piece.blob, path: `${rootFolderName}/${subfolderName}/${piece.name}.jpg` });
+                                 progressCallback(); await delay(5);
+                             }
+                         }
+                    }
+                } else if (workflow === 'custom') {
+                    const { custom_source: sourceFiles } = files;
+                    const { width, height, extractionMode, allowRotation } = customOptions;
+                    totalSteps = sourceFiles.length;
+
+                    for (const fileData of sourceFiles) {
+                        const img = await createImageFromBlob(fileData.file);
+                        let finalPieces = [];
+                        let format = `${width}x${height}`;
+
+                        if (extractionMode === 'single') {
+                            const outputWidthPx = Math.round(width * PIXELS_PER_CM);
+                            const outputHeightPx = Math.round(height * PIXELS_PER_CM);
+                            if (img.width >= outputWidthPx && img.height >= outputHeightPx) {
+                                finalPieces = await performSingleCustomCut(img, outputWidthPx, outputHeightPx, format, baseName, nameCounters);
+                            }
+                        } else { // Tiling mode
+                            const result = await performTilingCustomCut(img, width, height, allowRotation, baseName, nameCounters);
+                            finalPieces = result.pieces;
+                            format = result.optimalFormat;
+                        }
+
+                        const subfolderName = `${rootFolderName}-${format}`;
+                        for (const piece of finalPieces) {
+                            allFilesForZipping.push({ blob: piece.blob, path: `${rootFolderName}/${subfolderName}/${piece.name}.jpg` });
+                        }
+                        
+                        progressCallback(); await delay(5);
+                    }
+                }
+    
+                const zip = new JSZip();
+                allFilesForZipping.forEach(file => zip.file(file.path, file.blob));
+                const zipBlob = await zip.generateAsync({ type: "blob" });
+                return { zipBlob, allFilesForZipping };
+            }
+    
+            function handleDownloadSingleJob(jobId) {
+                const job = jobQueue.find(j => j.id === jobId);
+                if (job && job.zipBlob) {
+                    const link = document.createElement('a');
+                    link.href = URL.createObjectURL(job.zipBlob);
+                    link.download = `recortes_COMPLETO_${job.baseName}.zip`;
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                    URL.revokeObjectURL(link.href);
+                }
+            }
+            
+            function handleDeleteJob(jobId) {
+                if (confirm('¿Estás seguro de que quieres eliminar este trabajo?')) {
+                    const jobIndex = jobQueue.findIndex(j => j.id === jobId);
+                    if (jobIndex > -1) {
+                        jobQueue.splice(jobIndex, 1);
+                        const jobEl = document.querySelector(`.queue-item[data-job-id="${jobId}"]`);
+                        if (jobEl) {
+                            jobEl.classList.add('removing');
+                            jobEl.addEventListener('transitionend', () => { jobEl.remove(); updateQueueActionsState(); });
+                        }
+                    }
+                }
+            }
+    
+            function handleCancelJob(jobId) {
+                if (confirm('¿Estás seguro de que quieres cancelar este trabajo en cola?')) { handleDeleteJob(jobId); }
+            }
+    
+            function handleClearCompleted() {
+                if (confirm('¿Estás seguro de que quieres limpiar todos los trabajos completados y con error?')) {
+                    jobQueue = jobQueue.filter(job => job.status === 'processing' || job.status === 'queued');
+                    document.querySelectorAll('.queue-item.status-completed, .queue-item.status-error').forEach(el => {
+                        el.classList.add('removing');
+                        el.addEventListener('transitionend', () => el.remove());
+                    });
+                    updateQueueActionsState();
+                }
+            }
+    
+            async function handleDownloadAllCompleted() {
+                const completedJobs = jobQueue.filter(job => job.status === 'completed' && job.fileList);
+                if (completedJobs.length === 0) { showNotification('No hay trabajos completados para descargar.', 'error'); return; }
+    
+                const button = downloadAllCompletedBtn;
+                const originalContent = button.innerHTML;
+                button.innerHTML = `<span class="spinner"></span> <span>Generando ZIP maestro...</span>`;
+                button.disabled = true;
+    
+                try {
+                    const masterFileList = [];
+                    completedJobs.forEach(job => masterFileList.push(...job.fileList));
+    
+                    const zip = new JSZip();
+                    masterFileList.forEach(file => zip.file(file.path, file.blob));
+    
+                    const content = await zip.generateAsync({ type: "blob" });
+                    const link = document.createElement('a');
+                    link.href = URL.createObjectURL(content);
+                    link.download = `recortes_COLA_COMPLETA_${new Date().toISOString().slice(0,10)}.zip`;
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                    URL.revokeObjectURL(link.href);
+    
+                    showNotification('¡Éxito! El ZIP maestro se ha guardado.');
+                } catch (error) {
+                    console.error("Error generando el ZIP maestro:", error);
+                    showNotification("Hubo un error al generar el ZIP maestro.", 'error');
+                } finally {
+                    button.innerHTML = originalContent; 
+                    updateQueueActionsState();
+                }
+            }
+    
+            function renderJobInQueue(job) {
+                const jobEl = document.createElement('div');
+                jobEl.className = `queue-item status-${job.status}`;
+                jobEl.dataset.jobId = job.id;
+                jobEl.innerHTML = getJobHTML(job);
+                queueContainer.appendChild(jobEl);
+                updateQueueActionsState();
+            }
+            
+            function updateJobUI(job) {
+                const jobEl = document.querySelector(`.queue-item[data-job-id="${job.id}"]`);
+                if (jobEl) {
+                    jobEl.className = `queue-item status-${job.status}`;
+                    jobEl.innerHTML = getJobHTML(job);
+                }
+                updateQueueActionsState();
+            }
+            
+            function updateJobProgress(jobId, completed, total) {
+                const jobEl = document.querySelector(`.queue-item[data-job-id="${jobId}"]`);
+                if (!jobEl) return;
+                const percentage = total > 0 ? Math.round((completed / total) * 100) : 0;
+                const progressTextEl = jobEl.querySelector('.progress-text');
+                const progressBarEl = jobEl.querySelector('.progress-bar');
+                if (progressTextEl) {
+                    progressTextEl.textContent = `Procesando (${completed}/${total})... ${percentage}%`;
+                }
+                if (progressBarEl) {
+                    progressBarEl.style.width = `${percentage}%`;
+                }
+            }
+            
+            function updateQueueActionsState() {
+                const completedJobsCount = jobQueue.filter(j => j.status === 'completed').length;
+                const finishedJobsCount = jobQueue.filter(j => j.status === 'completed' || j.status === 'error').length;
+    
+                downloadAllCompletedBtn.disabled = completedJobsCount === 0;
+                downloadAllBtnText.textContent = completedJobsCount > 0 ? `Descargar Completados (${completedJobsCount})` : 'Descargar Completados';
+                
+                clearCompletedBtn.disabled = finishedJobsCount === 0;
+            }
+    
+            function getJobHTML(job) {
+                const statusInfo = {
+                    queued: { icon: '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>', text: 'En cola' },
+                    processing: { icon: '<div class="spinner" style="width:20px;height:20px;border-color:rgba(0,0,0,0.1);border-top-color:currentColor;"></div>', text: 'Procesando...' },
+                    completed: { icon: '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>', text: 'Completado' },
+                    error: { icon: '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" /></svg>', text: 'Error' }
+                };
+                const currentStatus = statusInfo[job.status];
+                const deleteIconSVG = '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.134-2.036-2.134H8.718c-1.126 0-2.037.955-2.037 2.134v.916m7.5 0a48.667 48.667 0 00-7.5 0" /></svg>';
+                const cancelIconSVG = '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9.75 9.75l4.5 4.5m0-4.5l-4.5 4.5M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>';
+    
+                let actionsHTML = '';
+                if (job.status === 'queued') { actionsHTML = `<span style="font-size:0.9em;color:var(--pamesa-text-light);font-weight:600;">${currentStatus.text}</span><button class="action-btn cancel-job-btn" title="Cancelar Trabajo">${cancelIconSVG}</button>`; } 
+                else if (job.status === 'completed') { actionsHTML = `<button class="btn btn-secondary download-job-zip-btn">Descargar</button><button class="action-btn delete-job-btn" title="Eliminar Trabajo">${deleteIconSVG}</button>`; } 
+                else if (job.status === 'error') { actionsHTML = `<span style="font-size:0.9em;color:var(--pamesa-red);font-weight:600;">${currentStatus.text}</span><button class="action-btn delete-job-btn" title="Eliminar Trabajo">${deleteIconSVG}</button>`; }
+                
+                let totalImages = 0;
+                let detailsText = '';
+                if(job.workflow === 'ceramic') { totalImages = job.files.square.length; detailsText = `${totalImages} imágenes | ${job.selectedStageIds.length} etapas`; }
+                else if(job.workflow === 'wood') { totalImages = job.files.wood.length; detailsText = `${totalImages} imágenes | ${job.selectedStageIds.length} etapas`; }
+                else if(job.workflow === 'custom') { 
+                    totalImages = job.files.custom_source.length; 
+                    detailsText = `${totalImages} imágenes | Corte: ${job.customOptions.width}x${job.customOptions.height}cm (${job.customOptions.extractionMode})`; 
+                }
+
+                let jobInfoDetails = `<div class="job-details">${detailsText}</div>`;
+                if (job.status === 'processing') {
+                    jobInfoDetails += `<div class="progress-container"><div class="progress-text">Iniciando...</div><div class="progress-bar-background"><div class="progress-bar"></div></div></div>`;
+                }
+    
+                return `<div class="job-status">${currentStatus.icon}</div><div class="job-info"><div class="job-title">${job.baseName}</div>${jobInfoDetails}</div><div class="job-actions">${actionsHTML}</div>`;
+            }
+    
+            function clearFormControlPanel() {
+                fileStore.clear();
+                previewContainer.innerHTML = '';
+                baseNameInput.value = '';
+                customWidthInput.value = '';
+                customHeightInput.value = '';
+                document.getElementById('modeSingle').checked = true;
+                document.getElementById('allowRotation').checked = false;
+                rotationOptionContainer.style.display = 'none';
+            }
+    
+            function getAllFilesFromStore(type) {
+                const files = [];
+                for (const fileGroup of fileStore.values()) {
+                    for (const fileData of fileGroup.values()) {
+                        if (fileData.type === type) { files.push(fileData); }
+                    }
+                }
+                return files;
+            }
+
+            const delay = ms => new Promise(res => setTimeout(res, ms));
+
+            function showNotification(message, type = 'success') {
+                clearTimeout(notificationTimeout);
+                notificationMessage.textContent = message;
+                notificationToast.style.backgroundColor = type === 'error' ? 'var(--pamesa-red)' : (type === 'info' ? 'var(--pamesa-info)' : 'var(--pamesa-success)');
+                notificationToast.classList.add('show');
+                notificationTimeout = setTimeout(() => { notificationToast.classList.remove('show'); }, 4000);
+            }
+
+            async function performCut(image, stage, baseName, counters) {
+                const piecePromises = [];
+                const pieceWidth = stage.cutDirection === 'vertical' ? image.width / stage.pieces : image.width;
+                const pieceHeight = stage.cutDirection === 'horizontal' ? image.height / stage.pieces : image.height;
+                const format = stage.outputNamePrefix;
+                for (let i = 0; i < stage.pieces; i++) {
+                    const canvas = document.createElement('canvas');
+                    canvas.width = pieceWidth; canvas.height = pieceHeight;
+                    const ctx = canvas.getContext('2d');
+                    const sx = stage.cutDirection === 'vertical' ? i * pieceWidth : 0;
+                    const sy = stage.cutDirection === 'horizontal' ? i * pieceHeight : 0;
+                    ctx.drawImage(image, sx, sy, pieceWidth, pieceHeight, 0, 0, pieceWidth, pieceHeight);
+                    const promise = new Promise(resolve => {
+                        const dataURL = canvas.toDataURL('image/jpeg', 1.0);
+                        canvas.toBlob(blob => {
+                            counters[format] = (counters[format] || 0) + 1;
+                            const pieceNumber = String(counters[format]).padStart(2, '0');
+                            const pieceName = `${baseName}${format}-${pieceNumber}`;
+                            resolve({ blob: blob, name: pieceName, url: URL.createObjectURL(blob), dataURL: dataURL });
+                        }, 'image/jpeg', 1.0);
+                    });
+                    piecePromises.push(promise);
+                }
+                return Promise.all(piecePromises);
+            }
+
+             async function performWoodCut(image, stage, baseName, counters) {
+                const piecePromises = [];
+                const pieceWidth = image.width;
+                const format = stage.outputNamePrefix;
+                const pieceHeights = [567, 567, 566];
+                let currentY = 0;
+
+                for (let i = 0; i < stage.pieces; i++) {
+                    const pieceHeight = pieceHeights[i];
+                    const canvas = document.createElement('canvas');
+                    canvas.width = pieceWidth; canvas.height = pieceHeight;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(image, 0, currentY, pieceWidth, pieceHeight, 0, 0, pieceWidth, pieceHeight);
+                    currentY += pieceHeight;
+                    const promise = new Promise(resolve => {
+                        const dataURL = canvas.toDataURL('image/jpeg', 1.0);
+                        canvas.toBlob(blob => {
+                            counters[format] = (counters[format] || 0) + 1;
+                            const pieceNumber = String(counters[format]).padStart(2, '0');
+                            const pieceName = `${baseName}${format}-${pieceNumber}`;
+                            resolve({ blob: blob, name: pieceName, url: URL.createObjectURL(blob), dataURL: dataURL });
+                        }, 'image/jpeg', 1.0);
+                    });
+                    piecePromises.push(promise);
+                }
+                return Promise.all(piecePromises);
+            }
+
+            async function performSingleCustomCut(image, outputWidthPx, outputHeightPx, format, baseName, counters) {
+                const canvas = document.createElement('canvas');
+                canvas.width = outputWidthPx;
+                canvas.height = outputHeightPx;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(image, 0, 0, outputWidthPx, outputHeightPx, 0, 0, outputWidthPx, outputHeightPx);
+                
+                return new Promise(resolve => {
+                    const dataURL = canvas.toDataURL('image/jpeg', 1.0);
+                    canvas.toBlob(blob => {
+                        counters[format] = (counters[format] || 0) + 1;
+                        const pieceNumber = String(counters[format]).padStart(2, '0');
+                        const pieceName = `${baseName}${format}-${pieceNumber}`;
+                        resolve([{ blob: blob, name: pieceName, url: URL.createObjectURL(blob), dataURL: dataURL }]);
+                    }, 'image/jpeg', 1.0);
+                });
+            }
+
+            async function performTilingCustomCut(image, widthCm, heightCm, allowRotation, baseName, counters) {
+                const pieceWidthPx = Math.round(widthCm * PIXELS_PER_CM);
+                const pieceHeightPx = Math.round(heightCm * PIXELS_PER_CM);
+
+                // Cálculo A (Sin rotación)
+                const colsA = pieceWidthPx > 0 ? Math.floor(image.width / pieceWidthPx) : 0;
+                const rowsA = pieceHeightPx > 0 ? Math.floor(image.height / pieceHeightPx) : 0;
+                const yieldA = colsA * rowsA;
+
+                // Cálculo B (Con rotación)
+                let yieldB = 0;
+                let colsB = 0, rowsB = 0;
+                if (allowRotation && pieceWidthPx !== pieceHeightPx) {
+                    colsB = pieceHeightPx > 0 ? Math.floor(image.width / pieceHeightPx) : 0;
+                    rowsB = pieceWidthPx > 0 ? Math.floor(image.height / pieceWidthPx) : 0;
+                    yieldB = colsB * rowsB;
+                }
+
+                let finalCols, finalRows, finalPieceWidth, finalPieceHeight, optimalFormat;
+                if (yieldB > yieldA) {
+                    finalCols = colsB;
+                    finalRows = rowsB;
+                    finalPieceWidth = pieceHeightPx;
+                    finalPieceHeight = pieceWidthPx;
+                    optimalFormat = `${heightCm}x${widthCm}`;
+                    if(baseName) showNotification(`Optimizando: se usará el formato rotado ${optimalFormat}cm para obtener más piezas.`, 'info');
+                } else {
+                    finalCols = colsA;
+                    finalRows = rowsA;
+                    finalPieceWidth = pieceWidthPx;
+                    finalPieceHeight = pieceHeightPx;
+                    optimalFormat = `${widthCm}x${heightCm}`;
+                }
+
+                if (finalCols === 0 || finalRows === 0) {
+                    if(baseName) showNotification(`Error: El formato ${optimalFormat}cm no cabe en la imagen de origen.`, 'error');
+                    return { pieces: [], optimalFormat, count: 0 };
+                }
+
+                const piecePromises = [];
+                for (let row = 0; row < finalRows; row++) {
+                    for (let col = 0; col < finalCols; col++) {
+                        const sx = col * finalPieceWidth;
+                        const sy = row * finalPieceHeight;
+
+                        const canvas = document.createElement('canvas');
+                        canvas.width = finalPieceWidth;
+                        canvas.height = finalPieceHeight;
+                        const ctx = canvas.getContext('2d');
+                        ctx.drawImage(image, sx, sy, finalPieceWidth, finalPieceHeight, 0, 0, finalPieceWidth, finalPieceHeight);
+
+                        const promise = new Promise(resolve => {
+                            const dataURL = canvas.toDataURL('image/jpeg', 1.0);
+                            canvas.toBlob(blob => {
+                                counters[optimalFormat] = (counters[optimalFormat] || 0) + 1;
+                                const pieceNumber = String(counters[optimalFormat]).padStart(2, '0');
+                                const pieceName = `${baseName}${optimalFormat}-${pieceNumber}`;
+                                resolve({ blob, name: pieceName, url: URL.createObjectURL(blob), dataURL });
+                            }, 'image/jpeg', 1.0);
+                        });
+                        piecePromises.push(promise);
+                    }
+                }
+                const pieces = await Promise.all(piecePromises);
+                return { pieces, optimalFormat, count: pieces.length };
+            }
+
+            function populateOptions() { 
+                const ceramicStages = cuttingStages.filter(s => s.type === 'ceramic');
+                const woodStages = cuttingStages.filter(s => s.type === 'wood');
+                
+                ceramicStages.forEach(stage => { ceramicCuttingOptions.innerHTML += `<label class="option"><input type="checkbox" data-stageid="${stage.id}" checked> ${stage.name}</label>`; }); 
+                woodStages.forEach(stage => { woodCuttingOptions.innerHTML += `<label class="option"><input type="checkbox" data-stageid="${stage.id}" checked> ${stage.name}</label>`; });
+            }
+
+            function extractBaseNameFromFile(filename) { let baseName = filename.substring(0, filename.lastIndexOf('.')) || filename; baseName = baseName.replace(/_\d{2}$/, '').replace(/_\d+[xX]\d+$/, '').replace(/_p\d$/, '').replace(/_/g, '-'); return baseName; }
+            function createImageFromBlob(blob) { return new Promise((resolve, reject) => { const img = new Image(); img.src = URL.createObjectURL(blob); img.onload = () => { URL.revokeObjectURL(img.src); resolve(img); }; img.onerror = reject; }); }
+            
+            function resetApplication() {
+                fileStore.clear(); jobQueue = []; isQueueProcessing = false; galleries = {}; currentGallery = []; currentIndex = 0; fileCounter = 0; currentWorkflow = null;
+                previewContainer.innerHTML = ''; baseNameInput.value = ''; globalDownloadContainer.innerHTML = '';
+                optionsContainer.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = true);
+                if (controlPanel.classList.contains('is-processing')) { setVisualProcessingState(false); }
+                processVisualBtn.querySelector('span').textContent = 'Visualizar Cortes';
+                resultsContainer.innerHTML = ''; queueContainer.innerHTML = '';
+                resultsInitialState.style.display = 'flex';
+                setTimeout(() => resultsInitialState.style.opacity = '1', 50);
+                updateQueueActionsState();
+                mainSubtitle.textContent = 'Selecciona el tipo de material que quieres procesar para comenzar.';
+                processingInterface.style.display = 'none';
+                workflowSelection.style.display = 'flex';
+                // Resetear controles personalizados
+                customWidthInput.value = '';
+                customHeightInput.value = '';
+                document.getElementById('modeSingle').checked = true;
+                document.getElementById('allowRotation').checked = false;
+                rotationOptionContainer.style.display = 'none';
+            }
+    
+            function openHelpModal() { helpModal.style.display = 'flex'; document.body.classList.add('modal-open'); }
+            function closeHelpModal() { helpModal.style.display = 'none'; checkAndRemoveModalOpenClass(); }
+            function openGalleryModal(galleryKey, index) { currentGallery = galleries[galleryKey]; currentIndex = parseInt(index, 10); galleryModal.style.display = 'flex'; document.body.classList.add('modal-open'); showGalleryImage(currentIndex); }
+            function closeGalleryModal() { galleryModal.style.display = 'none'; checkAndRemoveModalOpenClass(); }
+            function openPlacementModal(pieces, format, baseName, layout) {
+                placementGrid.innerHTML = '';
+                const [cols] = layout.split('x').map(Number);
+                placementGrid.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
+                const shuffledPieces = [...pieces].sort(() => Math.random() - 0.5);
+                const isWood = format.includes('madera');
+		        let isRectangular = false;
+		        if (!isWood) {
+		            const dimensions = format.split('x');
+		            if (dimensions.length === 2) {
+		                const w = parseInt(dimensions[0], 10);
+		                const h = parseInt(dimensions[1], 10);
+		                if (!isNaN(w) && !isNaN(h) && w !== h) { isRectangular = true; }
+		            }
+		        }
+		        shuffledPieces.forEach(piece => {
+		            const img = document.createElement('img');
+		            img.src = piece.dataURL; 
+		            let rotation;
+		            if (isWood || isRectangular) { rotation = [0, 180][Math.floor(Math.random() * 2)]; } 
+                    else { rotation = [0, 90, 180, 270][Math.floor(Math.random() * 4)]; }
+		            img.style.transform = `rotate(${rotation}deg)`;
+		            placementGrid.appendChild(img);
+		        });
+                downloadPlacementBtn.dataset.format = format;
+                downloadPlacementBtn.dataset.baseName = baseName;
+                placementModal.style.display = 'flex'; document.body.classList.add('modal-open');
+            }
+            function closePlacementModal() { placementModal.style.display = 'none'; checkAndRemoveModalOpenClass(); }
+            
+            function openLayoutSelectionModal(options, pieces, format, baseName) {
+                const container = document.getElementById('layoutOptionsContainer');
+                container.innerHTML = '';
+                options.forEach(option => {
+                    const btn = document.createElement('button');
+                    btn.className = 'btn btn-secondary';
+                    btn.textContent = option.replace('x', ' × ');
+                    btn.addEventListener('click', () => { closeLayoutSelectionModal(); openPlacementModal(pieces, format, baseName, option); });
+                    container.appendChild(btn);
+                });
+                layoutSelectionModal.style.display = 'flex'; document.body.classList.add('modal-open');
+            }
+
+            function closeLayoutSelectionModal() { layoutSelectionModal.style.display = 'none'; checkAndRemoveModalOpenClass(); }
+
+            function calculateLayoutOptions(count) {
+                const factors = new Set();
+                for (let i = 1; i <= Math.sqrt(count); i++) {
+                    if (count % i === 0) {
+                        const factor1 = i; const factor2 = count / i;
+                        factors.add(`${factor1}x${factor2}`); factors.add(`${factor2}x${factor1}`);
+                    }
+                }
+                return Array.from(factors);
+            }
+
+            function closeAllModals() { closeGalleryModal(); closePlacementModal(); closeHelpModal(); closeLayoutSelectionModal(); }
+
+            function checkAndRemoveModalOpenClass() {
+                const anyModalOpen = galleryModal.style.display === 'flex' || placementModal.style.display === 'flex' || helpModal.style.display === 'flex' || layoutSelectionModal.style.display === 'flex';
+                if (!anyModalOpen) { document.body.classList.remove('modal-open'); }
+            }
+
+            function showGalleryImage(index) { if (!currentGallery || !currentGallery[index]) return; modalImage.src = currentGallery[index].url || currentGallery[index].dataURL; modalCounter.textContent = `Imagen ${index + 1} de ${currentGallery.length}`; modalPrev.classList.toggle('disabled', index === 0); modalNext.classList.toggle('disabled', index === currentGallery.length - 1); }
+            
+            function createFormatGroupHTML(format, titleType, baseName, totalPieces, isSource, showPlacementButton) {
+                 const zipName = isSource ? `matrices_${format}${baseName ? `_${baseName}` : ''}.zip` : `recortes_${format}${baseName ? `_${baseName}` : ''}.zip`;
+                const safeBaseName = baseName.replace(/"/g, '&quot;');
+                const displayFormat = format.replace('-madera', '');
+                return `
+                <div class="format-group processing" id="format-group-${format}">
+                    <div class="format-header">
+                        <div class="title-wrapper">
+                            <h4 class="model-title">${safeBaseName || titleType}</h4>
+                            <h3 class="format-title">Formato: ${displayFormat} (<span class="piece-count">0</span>/${totalPieces} piezas)</h3>
+                        </div>
+                        <div class="format-header-buttons">
+                             ${showPlacementButton ? `<button class="btn btn-secondary" data-format="${format}" data-base-name="${safeBaseName}">Ver Colocación</button>` : ''}
+                             <button class="btn btn-secondary" data-zip-name="${zipName}" data-format="${format}" style="border-color: var(--pamesa-red); color: var(--pamesa-red);">Descargar ${displayFormat}</button>
+                        </div>
+                        <div class="format-status">
+                            <div class="status-spinner"></div>
+                            <svg class="status-check" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" /></svg>
+                            <span class="format-status-text">En cola...</span>
+                        </div>
+                    </div>
+                    <div class="pieces-container"></div>
+                </div>`;
+            }
+
+            async function renderPiecesSequentially(pieces, formatGroup, startIndex = 0) {
+                const container = formatGroup.querySelector('.pieces-container');
+                const pieceCountEl = formatGroup.querySelector('.piece-count');
+                const format = formatGroup.id.replace('format-group-', '');
+                const isTall = format === '120x280';
+                const isWood = format.includes('madera');
+                
+                let w, h;
+                if (isTall) { h = 280 * (VISUAL_SCALE_FACTOR / 2); w = 120 * (VISUAL_SCALE_FACTOR / 2); } 
+                else if (isWood) { w = 120 * VISUAL_SCALE_FACTOR; h = 20 * VISUAL_SCALE_FACTOR; } 
+                else {
+                    const dims = format.split('x');
+                    if (dims.length === 2) { [w, h] = dims.map(n => parseFloat(n) * VISUAL_SCALE_FACTOR); } 
+                    else { w = h = 100; /* Fallback */ }
+                }
+
+                let currentCount = parseInt(pieceCountEl.textContent, 10);
+                for (let i = 0; i < pieces.length; i++) {
+                    const piece = pieces[i];
+                    const pieceItem = document.createElement('div');
+                    pieceItem.className = 'piece-item';
+                    const pieceNumber = piece.name.split('-').pop() || '';
+                    const galleryKey = format; const galleryIndex = startIndex + i;
+                    const imgStyle = `width:${w}px; height:${h}px;`;
+                    const imgClass = isTall ? 'piece-tall' : '';
+                    pieceItem.innerHTML = `<img src="${piece.url || piece.dataURL}" alt="${piece.name}" style="${imgStyle}" class="${imgClass}" data-gallery-key="${galleryKey}" data-index="${galleryIndex}"><p>${pieceNumber}</p>`;
+                    container.appendChild(pieceItem);
+                    await delay(10);
+                    pieceItem.classList.add('visible');
+                    pieceCountEl.textContent = currentCount + i + 1;
+                    await delay(PIECE_APPEARANCE_DELAY);
+                }
+            }
+
+            function generateGlobalDownloadButtons(allSourceImages, allGeneratedPieces, baseName) {
+                globalDownloadContainer.innerHTML = '';
+                const allFilesForZipping = [];
+                const rawBaseName = baseNameInput.value.trim();
+                const rootFolderName = rawBaseName.endsWith('-') ? rawBaseName.slice(0, -1) : (rawBaseName || 'Pamesa_Recortes');
+                
+                if (allSourceImages.tall) { allSourceImages.tall.forEach((fileData, index) => { const fileName = `${baseName}120x280-${String(index + 1).padStart(2, '0')}.jpg`; const subfolderName = `${rootFolderName}-120x280`; allFilesForZipping.push({ blob: fileData.file, path: `${rootFolderName}/${subfolderName}/${fileName}` }); }); }
+                if (allSourceImages.square) { allSourceImages.square.forEach((img, index) => { const fileName = `${baseName}120x120-${String(index + 1).padStart(2, '0')}.jpg`; const subfolderName = `${rootFolderName}-120x120`; allFilesForZipping.push({ blob: img.blob, path: `${rootFolderName}/${subfolderName}/${fileName}` }); }); }
+                Object.entries(allGeneratedPieces).forEach(([format, pieces]) => { const subfolderName = `${rootFolderName}-${format}`; pieces.forEach(piece => { allFilesForZipping.push({ blob: piece.blob, path: `${rootFolderName}/${subfolderName}/${piece.name}.jpg` }); }); });
+    
+                if (allFilesForZipping.length > 0) {
+                    const zipName = `recortes_COMPLETO_${rootFolderName}.zip`;
+                    const btnAll = document.createElement('button');
+                    btnAll.className = 'btn btn-secondary';
+                    btnAll.innerHTML = `<svg class="icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" /></svg><span>Descargar Todo (.zip)</span>`;
+                    btnAll.style.borderColor = 'var(--pamesa-red)'; btnAll.style.color = 'var(--pamesa-red)';
+                    btnAll.addEventListener('click', (e) => downloadZip(allFilesForZipping, zipName, e.currentTarget));
+                    globalDownloadContainer.appendChild(btnAll);
+                }
+            }
+            async function downloadZip(pieces, fileName, buttonElement) {
+                let filesToZip;
+                if (Array.isArray(pieces)) { filesToZip = pieces; } 
+                else {
+                    const format = pieces; filesToZip = [];
+                    if (galleries[format]) { filesToZip.push(...galleries[format].map(p => ({ blob: p.blob, name: `${p.name}.jpg` }))); }
+                    if (format === '120x120' && galleries['120x280']) { filesToZip.unshift(...galleries['120x280'].map(p => ({ blob: p.blob, name: `${p.name}.jpg` }))); }
+                }
+    
+                if (filesToZip.length === 0) { showNotification('Error: No hay archivos para descargar.', 'error'); return; }
+    
+                let originalButtonContent = '';
+                if (buttonElement) { originalButtonContent = buttonElement.innerHTML; buttonElement.innerHTML = `<span class="spinner"></span> <span>Generando...</span>`; buttonElement.disabled = true; }
+                try {
+                    const zip = new JSZip();
+                    filesToZip.forEach(piece => { const filePath = piece.path ? piece.path : piece.name; zip.file(filePath, piece.blob); });
+                    const content = await zip.generateAsync({ type: "blob" });
+                    const link = document.createElement('a');
+                    link.href = URL.createObjectURL(content); link.download = fileName; document.body.appendChild(link);
+                    link.click(); document.body.removeChild(link); URL.revokeObjectURL(link.href);
+                    showNotification('¡Éxito! Tu ZIP se ha guardado en Descargas.');
+                } catch (error) { console.error("Error generando el ZIP:", error); showNotification("Hubo un error al generar el archivo ZIP.", 'error');
+                } finally { if (buttonElement) { buttonElement.innerHTML = originalButtonContent; buttonElement.disabled = false; } }
+            }
+             async function handleDownloadPlacement() {
+                const button = downloadPlacementBtn;
+                const originalText = button.textContent;
+                button.innerHTML = `<span class="spinner"></span> <span>Generando...</span>`; button.disabled = true;
+                try {
+                    const canvas = await html2canvas(document.getElementById('placementGrid'), { backgroundColor: '#1a1a1a', useCORS: true, scale: 1 });
+                    const format = button.dataset.format;
+                    const baseNameRaw = button.dataset.baseName || 'Pamesa';
+                    const baseName = baseNameRaw.endsWith('-') ? baseNameRaw.slice(0, -1) : baseNameRaw;
+                    const fileName = `colocacion_${baseName}_${format}.jpg`;
+                    const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.9));
+                    const link = document.createElement('a');
+                    link.href = URL.createObjectURL(blob); link.download = fileName; document.body.appendChild(link);
+                    link.click(); document.body.removeChild(link); URL.revokeObjectURL(link.href);
+                    showNotification('¡Éxito! Tu imagen JPG se ha guardado.');
+                } catch (error) { console.error("Error al generar la imagen del panel:", error); showNotification("Hubo un error al generar la imagen.", 'error');
+                } finally { button.innerHTML = originalText; button.disabled = false; }
+            }
+            function handleResultsContainerClick(e) {
+                const target = e.target.closest('img, button.btn');
+                if (!target) return;
+                
+                if (target.tagName === 'IMG' && target.dataset.galleryKey) { openGalleryModal(target.dataset.galleryKey, parseInt(target.dataset.index, 10)); } 
+                else if (target.matches('[data-format]') && !target.matches('[data-zip-name]')) {
+                    const format = target.dataset.format; const baseName = target.dataset.baseName || '';
+                    if (galleries[format]) {
+                        const pieces = galleries[format];
+                        const layoutOptions = calculateLayoutOptions(pieces.length);
+                        openLayoutSelectionModal(layoutOptions, pieces, format, baseName);
+                    }
+                } else if (target.matches('[data-zip-name]')) {
+                    const format = target.dataset.format; const zipName = target.dataset.zipName;
+                    downloadZip(format, zipName, target);
+                }
+            }
+        });
+    </script>
+</body>
+</html>

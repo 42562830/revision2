@@ -1,0 +1,1488 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pamesa - Simulador de Relieve</title>
+    
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+
+    <style>
+        /* --- VARIABLES DE DISEÑO Y CONFIGURACIÓN GLOBAL (DESDE HUB) --- */
+        :root {
+            --pamesa-red: #CC0000;
+            --pamesa-red-dark: #A30000;
+            --pamesa-text-dark: #1a1a1a;
+            --pamesa-text-light: #5f676d;
+            --pamesa-background-light: #f8f9fa;
+            --pamesa-border-color: #e9ecef;
+            --pamesa-white: #ffffff;
+            --pamesa-success: #28a745;
+            --shadow-sm: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+            --shadow-md: 0 10px 15px -3px rgba(0, 0, 0, 0.07), 0 4px 6px -2px rgba(0, 0, 0, 0.04);
+        }
+
+        /* --- ESTILOS GLOBALES (DESDE HUB) --- */
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        html { scroll-behavior: smooth; }
+
+        body {
+            font-family: 'Montserrat', sans-serif;
+            background-color: var(--pamesa-background-light);
+            color: var(--pamesa-text-dark);
+            margin: 0;
+            line-height: 1.6;
+            overflow: hidden;
+        }
+        body.modal-open {
+            overflow: hidden;
+        }
+
+        /* --- PANTALLA DE BIENVENIDA --- */
+        #welcomeScreen {
+            position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+            z-index: 9999; display: flex; flex-direction: column;
+            justify-content: flex-end; align-items: center; padding-bottom: 10vh;
+            box-sizing: border-box; transition: opacity 0.5s ease-in-out;
+            background-color: #000;
+        }
+        #welcomeScreen h1 {
+            color: var(--pamesa-white); font-size: 2.5rem; text-align: center;
+            margin-bottom: 25px; text-shadow: 2px 2px 8px rgba(0,0,0,0.7);
+            font-weight: 700;
+        }
+
+        /* --- ESTRUCTURA DE LA APLICACIÓN --- */
+        .app-layout { display: none; height: 100vh; flex-direction: row;}
+        .control-panel {
+            width: 450px; flex-shrink: 0; background-color: var(--pamesa-white);
+            box-shadow: var(--shadow-md);
+            display: flex; flex-direction: column; z-index: 10;
+        }
+        .control-panel-header {
+            display: flex;
+            align-items: center;
+            padding: 15px 30px;
+            border-bottom: 1px solid var(--pamesa-border-color);
+            background-color: var(--pamesa-red);
+        }
+        .back-to-hub-link {
+            display: inline-block;
+            line-height: 0;
+            transition: opacity 0.3s ease;
+        }
+        .back-to-hub-link:hover { opacity: 0.85; }
+        .control-panel-header img { height: 40px; width: auto; filter: brightness(0) invert(1); }
+        .control-panel-body { padding: 30px; overflow-y: auto; flex-grow: 1; }
+        .results-canvas { flex-grow: 1; padding: 40px; overflow-y: auto; background-color: var(--pamesa-background-light); position: relative; }
+        
+        h1, h2 { color: var(--pamesa-text-dark); margin: 0; font-weight: 700; }
+        h1 {font-size: 1.8em;}
+        h2 {font-size: 1.4em;}
+        .title-container { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+        p.subtitle { color: var(--pamesa-text-light); line-height: 1.6; margin: 0 0 25px; }
+
+        #resetBtn, #helpBtn {
+            background-color: transparent; border: none; padding: 0; cursor: pointer;
+            color: var(--pamesa-text-light); transition: color 0.2s ease-in-out;
+            display: flex; align-items: center; justify-content: center; margin-left: auto;
+        }
+        #resetBtn { margin-left: 10px; }
+        #resetBtn:hover, #helpBtn:hover { color: var(--pamesa-red); }
+        #resetBtn svg, #helpBtn svg { width: 24px; height: 24px; }
+
+        /* --- COMPONENTES REUTILIZABLES: BOTONES (DESDE HUB) --- */
+        .btn {
+            display: inline-flex;
+            text-decoration: none;
+            font-weight: 600;
+            font-size: 0.95rem;
+            padding: 12px 28px;
+            border-radius: 50px;
+            transition: all 0.3s ease;
+            border: 2px solid transparent;
+            cursor: pointer;
+            justify-content: center;
+            align-items: center;
+            gap: 10px;
+            width: 100%;
+        }
+        .btn-primary {
+            color: var(--pamesa-white);
+            background-color: var(--pamesa-red);
+            position: relative;
+            overflow: hidden;
+        }
+        .btn-primary:hover:not(:disabled) {
+            background-color: var(--pamesa-red-dark);
+            transform: translateY(-3px);
+            box-shadow: 0 10px 20px rgba(204, 0, 0, 0.2);
+        }
+        .btn-primary::after {
+            content: ''; position: absolute; top: 0; left: -150%;
+            width: 100%; height: 100%;
+            background: linear-gradient(110deg, rgba(255, 255, 255, 0) 40%, rgba(255, 255, 255, 0.25) 50%, rgba(255, 255, 255, 0) 60%);
+            transform: skewX(-25deg);
+            transition: left 0.8s ease-in-out;
+        }
+        .btn-primary:hover::after { left: 150%; }
+
+        .btn-secondary {
+            color: var(--pamesa-text-dark);
+            background-color: transparent;
+            border-color: var(--pamesa-border-color);
+        }
+        .btn-secondary:hover:not(:disabled) {
+            background-color: var(--pamesa-background-light);
+            border-color: var(--pamesa-text-light);
+        }
+        .btn:disabled {
+            background-color: #9e9e9e;
+            cursor: not-allowed;
+            box-shadow: none; transform: none;
+            border-color: transparent;
+            color: var(--pamesa-white);
+        }
+        .btn-success {
+            background-color: var(--pamesa-success);
+            color: var(--pamesa-white);
+        }
+        .btn-success:hover:not(:disabled) {
+            background-color: #218838;
+            transform: translateY(-3px);
+            box-shadow: 0 10px 20px rgba(40, 167, 69, 0.2);
+        }
+        .spinner { width: 20px; height: 20px; border: 2px solid rgba(255,255,255,0.3); border-top-color: #fff; border-radius: 50%; animation: spin 1s linear infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* --- SECCIONES DE SUBIDA Y FORMULARIO --- */
+        .upload-section { margin-bottom: 25px; }
+        .upload-area { border: 2px dashed var(--pamesa-border-color); border-radius: 16px; padding: 20px; cursor: pointer; background-color: var(--pamesa-white); transition: all 0.3s; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; }
+        .upload-area:hover { border-color: var(--pamesa-red); background-color: #fffafaf5; }
+        .upload-area .upload-icon { width: 40px; height: 40px; color: var(--pamesa-red); margin-bottom: 15px; }
+        .upload-area .upload-text-main { font-weight: 600; font-size: 1.1em; color: var(--pamesa-text-dark); margin: 0 0 5px 0; }
+        .upload-area .upload-text-secondary { color: var(--pamesa-text-light); margin: 0; font-size: 0.9em; }
+        .upload-area input[type="file"] { display: none; }
+
+        .preview-container { margin-top: 15px; display: flex; flex-wrap: wrap; gap: 10px; }
+        .preview-item { position: relative; border: 2px solid var(--pamesa-border-color); border-radius: 8px; padding: 4px; background-color: white; width: 90px; height: 90px; text-align: center; box-shadow: var(--shadow-sm); }
+        .preview-item.relief-map-preview { border-color: var(--pamesa-red); border-width: 3px; }
+        .preview-item img { width: 100%; height: 100%; object-fit: cover; display: block; border-radius: 4px;}
+        
+        .control-group { border-top: 1px solid var(--pamesa-border-color); padding-top: 25px; margin-top: 25px; }
+        .control-group h3 { margin-bottom: 15px; font-size: 1.1em; }
+        
+        .actions-bar { margin-top: 30px; }
+        #globalDownloadContainer { margin-top: 20px; display: flex; flex-direction: column; gap: 12px; }
+
+        /* --- ZONA DE RESULTADOS --- */
+        #resultsInitialState, #generatedReliefResultContainer {
+            display: flex; flex-direction: column; align-items: center; justify-content: center; 
+            height: 100%; text-align: center; color: #ccc;
+        }
+        #resultsInitialState svg { width: 100px; height: 100px; margin-bottom: 20px; }
+        #resultsInitialState h2 { margin: 0; font-size: 1.5em; color: #ccc; }
+        #reliefResultContainer { display: grid; grid-template-columns: repeat(auto-fill, minmax(350px, 1fr)); gap: 30px; }
+        #generatedReliefResultContainer img {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+            box-shadow: var(--shadow-md);
+        }
+
+        .result-card { 
+            background: var(--pamesa-white); border: 1px solid var(--pamesa-border-color); border-radius: 16px;
+            padding: 20px; box-shadow: var(--shadow-sm); display: flex; flex-direction: column; gap: 15px;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+        .result-card:hover { transform: translateY(-8px); box-shadow: var(--shadow-md); }
+        .result-card-header { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+        .result-card h3 { 
+            margin: 0; font-size: 1em; color: var(--pamesa-text-dark); word-break: break-all; 
+            overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex-grow: 1; 
+        }
+        .result-image-container { width: 100%; height: auto; box-shadow: var(--shadow-sm); cursor: pointer; overflow: hidden; position: relative; }
+        .result-image { width: 100%; height: 100%; display: block; object-fit: cover; transition: filter 0.2s ease-out; }
+        .status-placeholder { grid-column: 1 / -1; height: 300px; display: flex; align-items: center; justify-content: center; border: 2px dashed var(--pamesa-border-color); border-radius: 8px; }
+        .status-placeholder .spinner { border-color: rgba(0,0,0,0.1); border-top-color: var(--pamesa-red); }
+        .adjust-btn { background: transparent; border: none; cursor: pointer; padding: 4px; color: var(--pamesa-text-light); transition: color 0.2s ease; }
+        .adjust-btn:hover { color: var(--pamesa-red); }
+        .adjust-btn svg { width: 20px; height: 20px; display: block; }
+        
+        .slider-group { margin-bottom: 12px; }
+        .slider-group label { display: flex; justify-content: space-between; align-items: center; font-weight: 600; font-size: 0.8em; margin-bottom: 8px; }
+        .slider-group label .value-display { font-weight: 500; color: var(--pamesa-text-light); background-color: var(--pamesa-border-color); padding: 1px 6px; border-radius: 4px; font-size: 0.9em; }
+        input[type="range"] { width: 100%; -webkit-appearance: none; appearance: none; background: transparent; cursor: pointer; }
+        input[type="range"]::-webkit-slider-runnable-track { height: 4px; background: var(--pamesa-border-color); border-radius: 2px; }
+        input[type="range"]::-moz-range-track { height: 4px; background: var(--pamesa-border-color); border-radius: 2px; }
+        input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; margin-top: -6px; width: 16px; height: 16px; border-radius: 50%; background-color: var(--pamesa-red); }
+        input[type="range"]::-moz-range-thumb { width: 16px; height: 16px; border-radius: 50%; background-color: var(--pamesa-red); border: none; }
+        
+        /* --- ESTILOS DE MODALES --- */
+        .modal {
+            display: none; position: fixed; z-index: 1000; inset: 0; align-items: center; justify-content: center;
+            background-color: rgba(0, 0, 0, 0.85); backdrop-filter: blur(5px); padding: 20px;
+        }
+        #helpModal .modal-content {
+            background-color: var(--pamesa-white); color: var(--pamesa-text-dark); padding: 30px 40px; border-radius: 16px; 
+            max-width: 850px; width: 90%; max-height: 90vh; overflow-y: auto; text-align: left; position: relative; 
+            box-sizing: border-box; box-shadow: var(--shadow-md);
+        }
+        #helpModal .modal-close { color: var(--pamesa-text-light); top: 15px; right: 20px; font-size: 35px; position: absolute; cursor: pointer; }
+        #helpModal h2 { font-size: 1.6em; color: var(--pamesa-red); margin-top: 0; margin-bottom: 20px; }
+        #helpModal p, #helpModal li { line-height: 1.7; color: var(--pamesa-text-light); }
+        #helpModal ol { padding-left: 25px; }
+        #helpModal li { margin-bottom: 15px; }
+        #helpModal strong { color: var(--pamesa-text-dark); font-weight: 600; }
+        #helpModal .modal-footer { text-align: right; margin-top: 30px; }
+        
+        #modalContent { display: flex; gap: 30px; align-items: flex-start; max-width: 95vw; max-height: 90vh; width: auto; height: auto;}
+        .modal-studio-viewer { flex-grow: 1; display: flex; align-items: center; justify-content: center; height: 100%; max-height: 90vh; }
+        .modal-studio-controls {
+            width: 300px; flex-shrink: 0; background-color: var(--pamesa-white); padding: 25px; border-radius: 12px;
+            color: var(--pamesa-text-dark); max-height: 90vh; overflow-y: auto;
+        }
+        .modal-studio-controls h3 { font-size: 1.2em; margin-bottom: 20px; color: var(--pamesa-red); }
+        .modal-studio-controls .slider-group label { font-size: 0.9em; }
+        .modal-studio-actions { margin-top: 25px; display: flex; flex-direction: column; gap: 10px; }
+        .modal-studio-actions .btn { width: 100%; }
+        
+        #closeModalBtn {
+            position: absolute; top: 15px; right: 15px; width: 40px; height: 40px; background-color: rgba(0,0,0, 0.3); 
+            color: white; border: none; border-radius: 50%; font-size: 24px; cursor: pointer;
+            display: flex; align-items: center; justify-content: center; transition: background-color 0.2s; z-index: 1050;
+        }
+        #closeModalBtn:hover { background-color: rgba(0,0,0, 0.5); }
+
+        .comparator { position: relative; overflow: hidden; box-shadow: var(--shadow-sm); cursor: ew-resize; background-color: #e2e8f0; touch-action: none; display: inline-block; line-height: 0; }
+        .comparator img { user-select: none; pointer-events: none; transition: filter 0.1s ease-out; display: block; max-width: calc(95vw - 380px); max-height: 90vh; width: auto; height: auto; }
+        .comparator .corrected-image { position: relative; }
+        .comparator .original-image { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 10; clip-path: inset(0 50% 0 0); will-change: clip-path; }
+        .comparator .slider { position: absolute; top: 0; left: 50%; width: 4px; height: 100%; background-color: rgba(255, 255, 255, 0.8); transform: translateX(-50%); z-index: 20; pointer-events: none; }
+        .comparator .slider-handle { position: absolute; top: 50%; left: 50%; width: 40px; height: 40px; border-radius: 50%; background-color: white; border: 2px solid rgba(0, 0, 0, 0.2); transform: translate(-50%, -50%); display: flex; align-items: center; justify-content: center; box-shadow: var(--shadow-sm); }
+        .comparator .slider-handle svg { width: 24px; height: 24px; color: var(--pamesa-text-dark); }
+        
+        .notification-toast {
+            position: fixed; bottom: 30px; left: 50%; transform: translate(-50%, 150%);
+            background-color: var(--pamesa-success); color: var(--pamesa-white);
+            padding: 15px 25px; border-radius: 50px; box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+            z-index: 10001; display: flex; align-items: center; gap: 15px;
+            font-weight: 600; opacity: 0; visibility: hidden;
+            transition: transform 0.4s cubic-bezier(0.215, 0.610, 0.355, 1), opacity 0.4s ease, visibility 0.4s;
+        }
+        .notification-toast.show { transform: translate(-50%, 0); opacity: 1; visibility: visible; }
+        .notification-toast svg { width: 24px; height: 24px; }
+
+        .nav-tabs {
+            display: flex;
+            border-bottom: 1px solid var(--pamesa-border-color);
+            margin-bottom: 25px;
+        }
+        .nav-tab {
+            padding: 10px 20px;
+            cursor: pointer;
+            background-color: transparent;
+            border: none;
+            border-bottom: 3px solid transparent;
+            font-size: 1rem;
+            font-weight: 600;
+            color: var(--pamesa-text-light);
+            transition: all 0.2s ease-in-out;
+            margin-bottom: -1px;
+        }
+        .nav-tab:hover {
+            color: var(--pamesa-red);
+        }
+        .nav-tab.active {
+            color: var(--pamesa-red);
+            border-bottom-color: var(--pamesa-red);
+        }
+        .tool-panel { display: none; }
+        .tool-panel.active { display: block; }
+        
+        .actions-bar-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        /* ESTILOS PARA NUEVOS CAMPOS DE TEXTO */
+        .input-group {
+            margin-bottom: 15px;
+        }
+        .input-group label {
+            display: block;
+            font-weight: 600;
+            font-size: 0.9em;
+            margin-bottom: 8px;
+        }
+        .text-input {
+            width: 100%;
+            padding: 10px 15px;
+            border: 2px solid var(--pamesa-border-color);
+            border-radius: 8px;
+            font-size: 0.95rem;
+            font-family: 'Montserrat', sans-serif;
+            transition: border-color 0.3s ease;
+        }
+        .text-input:focus {
+            outline: none;
+            border-color: var(--pamesa-red);
+        }
+        .filename-preview {
+            display: block;
+            margin-top: 8px;
+            font-size: 0.8em;
+            color: var(--pamesa-text-light);
+            word-break: break-all;
+        }
+
+        /* --- NUEVOS ESTILOS PARA MODAL DE COLOCACIÓN (DE MASTER CUTT) --- */
+        #placementModal .modal-content-wrapper { position: relative; width: 95%; height: 95%; }
+        #placementModal .modal-content { width: 100%; height: 100%; background-color: var(--pamesa-text-dark); padding: 20px; box-sizing: border-box; overflow: auto; border-radius: 8px; }
+        #placementGrid { display: grid; gap: 2px; }
+        #placementGrid img { width: 100%; height: 100%; object-fit: cover; display: block; }
+        #downloadPlacementBtn { position: absolute; top: 25px; right: 80px; z-index: 1051; background-color: var(--pamesa-red); width: auto; font-size: 0.8rem; }
+        #downloadPlacementBtn:disabled { background-color: #9e9e9e; cursor: wait; }
+        
+        #layoutSelectionModal .modal-content { background-color: var(--pamesa-white); color: var(--pamesa-text-dark); padding: 30px 40px; border-radius: 16px; max-width: 600px; width: 90%; max-height: 90vh; overflow-y: auto; text-align: center; position: relative; box-sizing: border-box; box-shadow: var(--shadow-md); }
+        #layoutSelectionModal .modal-close { color: var(--pamesa-text-light); top: 15px; right: 20px; font-size: 35px; position: absolute; cursor: pointer; }
+        #layoutSelectionModal h2 { font-size: 1.6em; color: var(--pamesa-red); margin-top: 0; margin-bottom: 10px; }
+        #layoutSelectionModal p { color: var(--pamesa-text-light); margin-bottom: 25px; }
+        #layoutOptionsContainer { display: flex; flex-wrap: wrap; justify-content: center; gap: 15px; margin-bottom: 25px; }
+        #layoutOptionsContainer .btn { width: auto; min-width: 120px; }
+        
+        .modal-divider {
+            height: 1px;
+            background-color: var(--pamesa-border-color);
+            margin: 30px 0;
+            border: 0;
+        }
+        
+        #customLayoutContainer h3 {
+            font-size: 1.2em;
+            color: var(--pamesa-text-dark);
+            margin-bottom: 20px;
+        }
+        .custom-layout-controls {
+            display: flex;
+            gap: 20px;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 20px;
+        }
+        .custom-layout-controls .input-group {
+            flex: 1;
+            margin-bottom: 0;
+            text-align: left;
+        }
+        .custom-layout-controls label {
+            font-size: 0.9em;
+            font-weight: 600;
+        }
+        .custom-layout-controls input[type="number"] {
+            width: 100%;
+            padding: 10px;
+            font-size: 1em;
+            border: 2px solid var(--pamesa-border-color);
+            border-radius: 8px;
+            text-align: center;
+        }
+        .custom-layout-controls input[type="number"]:focus {
+            outline: none;
+            border-color: var(--pamesa-red);
+        }
+        #generateCustomLayoutBtn {
+            width: 100%;
+        }
+
+
+    </style>
+</head>
+<body>
+
+    <div id="welcomeScreen">
+        <h1>Simulador de Relieve</h1>
+        <button id="enterAppBtn" class="btn btn-primary" style="width: auto;">Iniciar Herramienta</button>
+    </div>
+
+    <div class="app-layout">
+        <aside class="control-panel" id="controlPanel">
+            <header class="control-panel-header">
+                 <a href="Productivity Hub.html" class="back-to-hub-link" title="Volver al Hub de Productividad">
+                    <img src="logo-pamesa_blanco.svg" alt="Pamesa Cerámica Logo">
+                </a>
+            </header>
+            <div class="control-panel-body">
+                <div class="title-container">
+                    <h1>Simulador de Relieve</h1>
+                    <button id="helpBtn" title="Ayuda"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m11.25 11.25.041-.02a.75.75 0 0 1 1.063.852l-.708 2.836a.75.75 0 0 0 1.063.853l.041-.021M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9-3.75h.008v.008H12V8.25Z" /></svg></button>
+                    <button id="resetBtn" title="Nuevo Proceso"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.134-2.036-2.134H8.718c-1.126 0-2.037.955-2.037 2.134v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" /></svg></button>
+                </div>
+                
+                <div class="nav-tabs">
+                    <button class="nav-tab active" data-tab="generate-relief">1. Generar Relieve</button>
+                    <button class="nav-tab" data-tab="apply-relief">2. Aplicar Relieve</button>
+                </div>
+                
+                <div id="tool-generate-relief" class="tool-panel active">
+                    <p class="subtitle">Crea un mapa de relieve con sombreado a partir de una imagen de alturas en escala de grises.</p>
+                    
+                    <div class="upload-section">
+                        <h2>1. Mapa de Alturas</h2>
+                        <div class="upload-area" id="heightMapUploadArea">
+                            <input type="file" id="heightMapUploader" accept="image/*">
+                            <svg class="upload-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9 8.25H7.5a2.25 2.25 0 0 0-2.25 2.25v9a2.25 2.25 0 0 0 2.25 2.25h9a2.25 2.25 0 0 0 2.25-2.25v-9a2.25 2.25 0 0 0-2.25-2.25H15M9 12l3 3m0 0 3-3m-3 3V2.25" /></svg>
+                            <p class="upload-text-main">Arrastra el mapa de alturas</p>
+                            <p class="upload-text-secondary">(Imagen en escala de grises)</p>
+                        </div>
+                    </div>
+                    
+                    <div class="control-group">
+                        <h3>Ajustes del Relieve</h3>
+                        <div class="slider-group">
+                            <label>Dirección Luz (Horizontal) <span id="lightDirectionXValue" class="value-display">-100</span></label>
+                            <input type="range" id="lightDirectionX" min="-100" max="100" value="-100" step="1">
+                        </div>
+                        <div class="slider-group">
+                            <label>Dirección Luz (Vertical) <span id="lightDirectionYValue" class="value-display">-100</span></label>
+                            <input type="range" id="lightDirectionY" min="-100" max="100" value="-100" step="1">
+                        </div>
+                        <div class="slider-group">
+                            <label>Intensidad del Relieve <span id="reliefIntensityValue" class="value-display">100%</span></label>
+                            <input type="range" id="reliefIntensity" min="0" max="500" value="100" step="1">
+                        </div>
+                    </div>
+
+                    <div class="control-group">
+                        <h3>Ajustes de Salida</h3>
+                        <div class="input-group">
+                            <label for="generateReliefFileName">Nombre Base del Archivo</label>
+                            <input type="text" id="generateReliefFileName" class="text-input" placeholder="Ej: MI_RELIEVE_CUSTOM">
+                            <small class="filename-preview" id="generateReliefFileNamePreview">Se usará el nombre del archivo original.</small>
+                        </div>
+                    </div>
+
+                    <div class="actions-bar-grid">
+                        <button id="generateHeightMapBtn" class="btn btn-primary" disabled>Generar</button>
+                        <button id="sendReliefBtn" class="btn btn-success" disabled>
+                            Usar este Relieve para Aplicar
+                        </button>
+                        <button id="downloadHeightMapBtn" class="btn btn-secondary" disabled>Descargar Relieve (.png)</button>
+                    </div>
+                </div>
+                
+                <div id="tool-apply-relief" class="tool-panel">
+                    <p class="subtitle">Aplica un único relieve a una o varias texturas base para generar resultados fotorrealistas en lote.</p>
+                    
+                    <div class="upload-section">
+                        <h2>1. Relieve (Volumen)</h2>
+                        <div class="upload-area" id="relief-map-upload-area">
+                            <input type="file" id="relief-map-uploader" accept="image/*">
+                            <svg class="upload-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" /></svg>
+                            <p class="upload-text-main">Arrastra el relieve en grises</p>
+                        </div>
+                        <div class="preview-container" id="reliefMapPreviewContainer"></div>
+                    </div>
+
+                    <div class="upload-section">
+                        <h2>2. Textura(s) Base (Color)</h2>
+                        <div class="upload-area" id="base-texture-upload-area">
+                            <input type="file" id="base-texture-uploader" accept="image/*" multiple>
+                            <svg class="upload-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909m-18 3.75h16.5a1.5 1.5 0 001.5-1.5V6a1.5 1.5 0 00-1.5-1.5H3.75A1.5 1.5 0 002.25 6v12a1.5 1.5 0 001.5 1.5z" /></svg>
+                            <p class="upload-text-main">Arrastra la(s) textura(s) de color</p>
+                        </div>
+                        <div class="preview-container" id="baseTexturePreviewContainer"></div>
+                    </div>
+                    
+                    <div class="control-group">
+                        <h3>Ajustes Globales</h3>
+                        <div class="slider-group">
+                            <label>Intensidad del Relieve <span id="fusionIntensityValue" class="value-display">100%</span></label>
+                            <input type="range" id="fusionIntensity" min="0" max="500" value="100" step="1">
+                        </div>
+                        <div class="slider-group">
+                            <label>Brillo <span id="finalBrightnessValue" class="value-display">100%</span></label>
+                            <input type="range" id="finalBrightness" min="50" max="150" value="100" step="1">
+                        </div>
+                        <div class="slider-group">
+                            <label>Contraste <span id="finalContrastValue" class="value-display">100%</span></label>
+                            <input type="range" id="finalContrast" min="50" max="150" value="100" step="1">
+                        </div>
+                    </div>
+
+                    <div class="control-group">
+                        <h3>Ajustes de Salida</h3>
+                        <div class="input-group">
+                            <label for="applyReliefFileName">Nombre Base de Archivos</label>
+                            <input type="text" id="applyReliefFileName" class="text-input" placeholder="Ej: RLV-DOSSO-BEIGE-36X80">
+                             <small class="filename-preview" id="applyReliefFileNamePreview">Se usará el nombre de cada textura original.</small>
+                        </div>
+                    </div>
+
+                    <div class="actions-bar">
+                        <button id="applyTextureBtn" class="btn btn-primary" disabled>Generar Relieve</button>
+                        <div id="globalDownloadContainer"></div>
+                    </div>
+                </div>
+
+            </div>
+        </aside>
+        <main class="results-canvas">
+            <div id="resultsInitialState">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 3.75v4.5m0-4.5h4.5m-4.5 0L9 9M3.75 20.25v-4.5m0 4.5h4.5m-4.5 0L9 15M20.25 3.75h-4.5m4.5 0v4.5m0-4.5L15 9m5.25 11.25h-4.5m4.5 0v-4.5m0 4.5L15 15" /></svg>
+                <h2>El resultado final aparecerá aquí</h2>
+            </div>
+            <div id="reliefResultContainer"></div>
+            <div id="generatedReliefResultContainer" style="display: none;"></div>
+        </main>
+    </div>
+    
+    <div id="helpModal" class="modal">
+        <div class="modal-content">
+            <span class="modal-close">&times;</span>
+            <h2>¿Cómo funciona el Simulador de Relieve?</h2>
+            <p>Esta herramienta aplica un mapa de relieve (sombras y luces) sobre una o varias texturas base, manteniendo el diseño de fondo (ej. vetas de un mármol).</p>
+            <ol>
+                <li><strong>Sube Relieve y Texturas</strong><p>Añade una imagen de relieve y una o varias texturas base en sus respectivas cajas.</p></li>
+                <li><strong>Ajustes Globales y Generación</strong><p>Usa los deslizadores para un primer ajuste general. Luego, haz clic en <strong>"Generar Relieve"</strong>.</p></li>
+                <li><strong>Ajuste Fino en el Estudio</strong><p>En cada resultado, haz clic en la imagen o en el icono ⚙️ para abrir el <strong>Estudio de Edición</strong>. Aquí podrás ajustar el Brillo y Contraste de forma precisa mientras comparas con el original.</p></li>
+                <li><strong>Guarda y Descarga</strong><p>Guarda los cambios en el Estudio para aplicarlos. Después, usa los botones de descarga individual o el botón verde <strong>"Descargar Todo (.zip)"</strong> para obtener todas las imágenes con sus ajustes finales.</p></li>
+            </ol>
+            <div class="modal-footer">
+                <button id="closeHelpModalBtn" class="btn btn-secondary" style="width: auto;">Entendido</button>
+            </div>
+        </div>
+    </div>
+    
+    <div id="comparatorModal" class="modal">
+        <div id="modalContent"></div>
+        <button id="closeModalBtn" title="Cerrar">&times;</button>
+    </div>
+
+    <div id="layoutSelectionModal" class="modal">
+        <div class="modal-content">
+            <span class="modal-close">&times;</span>
+            <h2>Seleccionar Disposición de Rejilla</h2>
+            <p>Elige una opción rápida o define una rejilla personalizada para la colocación.</p>
+            
+            <div id="layoutOptionsContainer">
+                <!-- Los botones de opciones se generarán aquí dinámicamente -->
+            </div>
+
+            <hr class="modal-divider">
+
+            <div id="customLayoutContainer">
+                <h3>Disposición Personalizada</h3>
+                <div class="custom-layout-controls">
+                    <div class="input-group">
+                        <label for="customColsInput">Columnas</label>
+                        <input type="number" id="customColsInput" min="1" placeholder="Ej: 4">
+                    </div>
+                    <div class="input-group">
+                        <label for="customRowsInput">Filas</label>
+                        <input type="number" id="customRowsInput" min="1" placeholder="Ej: 3">
+                    </div>
+                </div>
+                <button id="generateCustomLayoutBtn" class="btn btn-primary" style="border-radius: 8px;">Generar Colocación</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="placementModal" class="modal">
+        <div class="modal-content-wrapper">
+            <span class="modal-close" style="color: white; right: 35px; top: 15px; font-size: 45px;">&times;</span>
+            <button id="downloadPlacementBtn" class="btn btn-primary">Descargar JPG</button>
+            <div class="modal-content">
+                <div id="placementGrid"></div>
+            </div>
+        </div>
+    </div>
+    
+    <div id="notificationToast" class="notification-toast">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+        <span id="notificationMessage"></span>
+    </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+
+    const DOM = {
+        // General System
+        enterBtn: document.getElementById('enterAppBtn'),
+        welcomeScreen: document.getElementById('welcomeScreen'),
+        appLayout: document.querySelector('.app-layout'),
+        resetBtn: document.getElementById('resetBtn'),
+        helpBtn: document.getElementById('helpBtn'),
+        notificationToast: document.getElementById('notificationToast'),
+        notificationMessage: document.getElementById('notificationMessage'),
+        
+        // Modals
+        helpModal: document.getElementById('helpModal'),
+        closeHelpModalBtn: document.getElementById('closeHelpModalBtn'),
+        comparatorModal: document.getElementById('comparatorModal'),
+        modalContent: document.getElementById('modalContent'),
+        closeModalBtn: document.getElementById('closeModalBtn'),
+        layoutSelectionModal: document.getElementById('layoutSelectionModal'),
+        placementModal: document.getElementById('placementModal'),
+        placementGrid: document.getElementById('placementGrid'),
+        downloadPlacementBtn: document.getElementById('downloadPlacementBtn'),
+        customColsInput: document.getElementById('customColsInput'),
+        customRowsInput: document.getElementById('customRowsInput'),
+        generateCustomLayoutBtn: document.getElementById('generateCustomLayoutBtn'),
+
+        // Tabs
+        tabs: document.querySelectorAll('.nav-tab'),
+        toolPanels: document.querySelectorAll('.tool-panel'),
+
+        // Tool: Apply Relief
+        resultsInitialState: document.getElementById('resultsInitialState'),
+        reliefMapUploadArea: document.getElementById('relief-map-upload-area'),
+        reliefMapUploader: document.getElementById('relief-map-uploader'),
+        reliefMapPreview: document.getElementById('reliefMapPreviewContainer'),
+        baseTextureUploadArea: document.getElementById('base-texture-upload-area'),
+        baseTextureUploader: document.getElementById('base-texture-uploader'),
+        baseTexturePreview: document.getElementById('baseTexturePreviewContainer'),
+        fusionIntensitySlider: document.getElementById('fusionIntensity'),
+        fusionIntensityValue: document.getElementById('fusionIntensityValue'),
+        finalBrightnessSlider: document.getElementById('finalBrightness'),
+        finalBrightnessValue: document.getElementById('finalBrightnessValue'),
+        finalContrastSlider: document.getElementById('finalContrast'),
+        finalContrastValue: document.getElementById('finalContrastValue'),
+        applyBtn: document.getElementById('applyTextureBtn'),
+        resultContainer: document.getElementById('reliefResultContainer'),
+        globalDownloadContainer: document.getElementById('globalDownloadContainer'),
+        applyReliefFileNameInput: document.getElementById('applyReliefFileName'),
+        applyReliefFileNamePreview: document.getElementById('applyReliefFileNamePreview'),
+
+        // Tool: Generate Relief
+        heightMapUploadArea: document.getElementById('heightMapUploadArea'),
+        heightMapUploader: document.getElementById('heightMapUploader'),
+        generateHeightMapBtn: document.getElementById('generateHeightMapBtn'),
+        downloadHeightMapBtn: document.getElementById('downloadHeightMapBtn'),
+        sendReliefBtn: document.getElementById('sendReliefBtn'),
+        generatedReliefResultContainer: document.getElementById('generatedReliefResultContainer'),
+        lightDirectionX: document.getElementById('lightDirectionX'),
+        lightDirectionXValue: document.getElementById('lightDirectionXValue'),
+        lightDirectionY: document.getElementById('lightDirectionY'),
+        lightDirectionYValue: document.getElementById('lightDirectionYValue'),
+        reliefIntensity: document.getElementById('reliefIntensity'),
+        reliefIntensityValue: document.getElementById('reliefIntensityValue'),
+        generateReliefFileNameInput: document.getElementById('generateReliefFileName'),
+        generateReliefFileNamePreview: document.getElementById('generateReliefFileNamePreview'),
+    };
+
+    // --- GLOBAL APP STATE ---
+    let reliefMapFile = null;
+    let baseTextureFiles = [];
+    let resultDataStore = [];
+    let generatedObjectUrls = [];
+    let debounceTimer;
+    let notificationTimeout;
+    
+    // --- GENERATE RELIEF TOOL STATE ---
+    let heightMapImage = null;
+    let fullResHeightMapCanvas = null;
+    let heightMapFileName = '';
+
+    const defaultAdjustments = () => ({
+        brightness: parseInt(DOM.finalBrightnessSlider.value),
+        contrast: parseInt(DOM.finalContrastSlider.value)
+    });
+    
+    const sanitizeFileName = (name) => {
+        return name.replace(/[\/\\:*?"<>|]/g, '_'); 
+    };
+
+    // --- INITIALIZATION AND GLOBAL EVENTS ---
+    DOM.enterBtn.addEventListener('click', () => {
+        if (document.documentElement.requestFullscreen) document.documentElement.requestFullscreen();
+        DOM.welcomeScreen.style.opacity = '0';
+        setTimeout(() => {
+            DOM.welcomeScreen.style.display = 'none';
+            DOM.appLayout.style.display = 'flex';
+        }, 500);
+    });
+
+    DOM.resetBtn.addEventListener('click', resetApplication);
+    
+    DOM.generateReliefFileNameInput.addEventListener('input', () => {
+        const baseName = sanitizeFileName(DOM.generateReliefFileNameInput.value.trim());
+        if (baseName) {
+            DOM.generateReliefFileNamePreview.textContent = `Se guardará como: RELIEVE_${baseName}.png`;
+        } else {
+            DOM.generateReliefFileNamePreview.textContent = `Se usará el nombre del archivo original.`;
+        }
+    });
+
+    DOM.applyReliefFileNameInput.addEventListener('input', () => {
+        const baseName = sanitizeFileName(DOM.applyReliefFileNameInput.value.trim());
+        if (baseName) {
+            DOM.applyReliefFileNamePreview.textContent = `Ej: ${baseName}-01.jpg`;
+        } else {
+            DOM.applyReliefFileNamePreview.textContent = `Se usará el nombre de cada textura original.`;
+        }
+    });
+
+    // --- TAB LOGIC ---
+    DOM.tabs.forEach(tab => {
+        tab.addEventListener('click', () => {
+            DOM.tabs.forEach(t => t.classList.remove('active'));
+            DOM.toolPanels.forEach(p => p.classList.remove('active'));
+            
+            tab.classList.add('active');
+            const activePanel = document.getElementById(`tool-${tab.dataset.tab}`);
+            activePanel.classList.add('active');
+            
+            DOM.resultsInitialState.style.display = 'flex';
+            DOM.resultContainer.style.display = 'none';
+            DOM.generatedReliefResultContainer.style.display = 'none';
+
+            if (tab.dataset.tab === 'apply-relief') {
+                if(resultDataStore.length > 0) {
+                    DOM.resultsInitialState.style.display = 'none';
+                    DOM.resultContainer.style.display = 'grid';
+                }
+            } else if (tab.dataset.tab === 'generate-relief') {
+                 const hasGeneratedContent = DOM.generatedReliefResultContainer.innerHTML.trim() !== '';
+                if(hasGeneratedContent){
+                    DOM.resultsInitialState.style.display = 'none';
+                    DOM.generatedReliefResultContainer.style.display = 'flex';
+                }
+            }
+        });
+    });
+
+    // --- START: TOOL 2 LOGIC: APPLY RELIEF ---
+    DOM.applyBtn.addEventListener('click', renderEffect);
+    
+    [DOM.fusionIntensitySlider, DOM.finalBrightnessSlider, DOM.finalContrastSlider].forEach(slider => {
+        slider.addEventListener('input', () => {
+            DOM.fusionIntensityValue.textContent = `${DOM.fusionIntensitySlider.value}%`;
+            DOM.finalBrightnessValue.textContent = `${DOM.finalBrightnessSlider.value}%`;
+            DOM.finalContrastValue.textContent = `${DOM.finalContrastSlider.value}%`;
+            if (resultDataStore.length > 0) {
+                clearTimeout(debounceTimer);
+                DOM.applyBtn.innerHTML = '<span class="spinner"></span> Actualizando...';
+                debounceTimer = setTimeout(renderEffect, 250);
+            }
+        });
+    });
+
+    const setupUploadArea = (area, uploader, isMultiple, handler) => {
+        area.addEventListener('click', () => uploader.click());
+        area.addEventListener('dragover', e => e.preventDefault());
+        area.addEventListener('drop', e => { e.preventDefault(); handler(isMultiple ? [...e.dataTransfer.files] : e.dataTransfer.files[0]); });
+        uploader.addEventListener('change', e => { handler(isMultiple ? [...e.target.files] : e.target.files[0]); e.target.value = ''; });
+    };
+
+    setupUploadArea(DOM.reliefMapUploadArea, DOM.reliefMapUploader, false, file => {
+        reliefMapFile = file;
+        DOM.reliefMapPreview.innerHTML = '';
+        createPreview(file, DOM.reliefMapPreview, 'relief-map-preview');
+        checkReadyState();
+    });
+
+    setupUploadArea(DOM.baseTextureUploadArea, DOM.baseTextureUploader, true, files => {
+        baseTextureFiles = files;
+        DOM.baseTexturePreview.innerHTML = '';
+        files.forEach(file => createPreview(file, DOM.baseTexturePreview));
+        checkReadyState();
+    });
+    
+    function createPreview(file, container, className = '') {
+        const reader = new FileReader();
+        reader.onload = e => {
+            const previewItem = document.createElement('div');
+            previewItem.className = `preview-item ${className}`;
+            previewItem.innerHTML = `<img src="${e.target.result}" alt="${file.name}">`;
+            container.appendChild(previewItem);
+        };
+        reader.readAsDataURL(file);
+    }
+    
+    function checkReadyState() {
+        DOM.applyBtn.disabled = !(reliefMapFile && baseTextureFiles.length > 0);
+    }
+
+    async function renderEffect() {
+        if (!reliefMapFile || baseTextureFiles.length === 0) return;
+        DOM.applyBtn.innerHTML = '<span class="spinner"></span> Procesando...';
+        DOM.applyBtn.disabled = true;
+        
+        DOM.resultsInitialState.style.display = 'none';
+        DOM.generatedReliefResultContainer.style.display = 'none';
+        DOM.resultContainer.style.display = 'grid';
+
+        DOM.resultContainer.innerHTML = `<div class="status-placeholder"><div class="spinner"></div><p style="margin-left: 10px;">Generando ${baseTextureFiles.length} imágenes...</p></div>`;
+        DOM.globalDownloadContainer.innerHTML = '';
+        
+        resetData();
+        
+        try {
+            const reliefMapImg = await loadImage(reliefMapFile);
+            DOM.resultContainer.innerHTML = '';
+
+            // The L* value for a neutral gray (128, 128, 128) which is our reference for the relief map.
+            const NEUTRAL_GRAY_L = 53.585;
+
+            for (const baseFile of baseTextureFiles) {
+                const baseTextureImg = await loadImage(baseFile);
+                const canvas = document.createElement('canvas');
+                canvas.width = baseTextureImg.width; canvas.height = baseTextureImg.height;
+                const ctx = canvas.getContext('2d', { willReadFrequently: true });
+
+                // Get Image Data for both images
+                ctx.drawImage(baseTextureImg, 0, 0);
+                const baseTextureData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                
+                ctx.drawImage(reliefMapImg, 0, 0, canvas.width, canvas.height);
+                const reliefMapData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                
+                const finalImageData = ctx.createImageData(canvas.width, canvas.height);
+                const intensity = parseInt(DOM.fusionIntensitySlider.value) / 100;
+                
+                // NEW: L*a*b* based color transfer logic
+                for (let i = 0; i < baseTextureData.data.length; i += 4) {
+                    // 1. Get COLOR from base texture
+                    const baseR = baseTextureData.data[i];
+                    const baseG = baseTextureData.data[i+1];
+                    const baseB = baseTextureData.data[i+2];
+                    const baseLab = rgbToLab([baseR, baseG, baseB]);
+                    const l_base = baseLab[0];
+                    const a_base = baseLab[1];
+                    const b_base = baseLab[2];
+
+                    // 2. Get LUMINANCE from relief map
+                    const reliefGray = reliefMapData.data[i]; // R=G=B in a grayscale image
+                    const l_relieve = rgbToLab([reliefGray, reliefGray, reliefGray])[0];
+
+                    // 3. Calculate the luminance difference from neutral gray and apply it
+                    const l_difference = l_relieve - NEUTRAL_GRAY_L;
+                    const final_L = l_base + l_difference * intensity;
+                    
+                    // 4. Recombine into a new L*a*b* pixel and convert back to RGB
+                    const finalLab = [final_L, a_base, b_base];
+                    const finalRgb = labToRgb(finalLab);
+
+                    finalImageData.data[i]   = finalRgb[0];
+                    finalImageData.data[i+1] = finalRgb[1];
+                    finalImageData.data[i+2] = finalRgb[2];
+                    finalImageData.data[i+3] = 255;
+                }
+                ctx.putImageData(finalImageData, 0, 0);
+
+                const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.95));
+                const { brightness, contrast } = defaultAdjustments();
+                const adjustedBlob = await applyAdjustmentsToBlob(blob, { brightness, contrast });
+
+                const resultUrl = URL.createObjectURL(adjustedBlob);
+                const originalUrl = URL.createObjectURL(baseFile);
+                generatedObjectUrls.push(resultUrl, originalUrl);
+                
+                const fileId = `${baseFile.name}-${baseFile.lastModified}`;
+                resultDataStore.push({
+                    fileId, originalUrl, resultUrl, initialBlob: blob, fileName: baseFile.name,
+                    adjustments: { brightness, contrast }
+                });
+                appendResultCard(resultDataStore.at(-1));
+            }
+
+            if (resultDataStore.length > 0) {
+                const downloadBtn = document.createElement('button');
+                downloadBtn.className = 'btn btn-success';
+                downloadBtn.innerHTML = `Descargar Todo (${resultDataStore.length}) en .zip`;
+                downloadBtn.addEventListener('click', () => downloadAllAsZip(downloadBtn));
+                DOM.globalDownloadContainer.appendChild(downloadBtn);
+
+                if (resultDataStore.length > 1) {
+                    const placementBtn = document.createElement('button');
+                    placementBtn.className = 'btn btn-secondary';
+                    placementBtn.textContent = 'Ver Colocación';
+                    placementBtn.addEventListener('click', () => {
+                        const layoutOptions = calculateLayoutOptions(resultDataStore.length);
+                        const baseName = DOM.applyReliefFileNameInput.value.trim();
+                        openLayoutSelectionModal(layoutOptions, resultDataStore, 'Relieve', baseName);
+                    });
+                    DOM.globalDownloadContainer.appendChild(placementBtn);
+                }
+            }
+        } catch (error) {
+            console.error("Error aplicando relieve:", error);
+            DOM.resultContainer.innerHTML = `<div class="result-card" style="grid-column: 1 / -1;"><p style="color:red;">Error al procesar las imágenes.</p></div>`;
+        } finally {
+            DOM.applyBtn.innerHTML = 'Generar de Nuevo';
+            DOM.applyBtn.disabled = false;
+        }
+    }
+
+    function appendResultCard(data) {
+        const { fileId, fileName, resultUrl } = data;
+        const card = document.createElement('div');
+        card.className = 'result-card';
+        card.dataset.fileId = fileId;
+        card.innerHTML = `
+            <div class="result-card-header">
+                <h3>${fileName}</h3>
+                <button class="adjust-btn" title="Ajustes Individuales">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.324.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 011.37.49l1.296 2.247a1.125 1.125 0 01-.26 1.431l-1.003.827c-.293.24-.438.613-.438.995s.145.755.438.995l1.003.827c.48.398.668 1.03.26 1.431l-1.296 2.247a1.125 1.125 0 01-1.37.49l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.57 6.57 0 01-.22.128c-.333.183-.582.495-.645.87l-.213 1.28c-.09.543-.56.941-1.11.941h-2.594c-.55 0-1.02-.398-1.11-.94l-.213-1.281c-.063-.374-.313-.686-.645-.87a6.52 6.52 0 01-.22-.127c-.324-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 01-1.37-.49l-1.296-2.247a1.125 1.125 0 01.26-1.431l1.004-.827c.292-.24.437-.613.437-.995s-.145-.755-.437-.995l-1.004-.827a1.125 1.125 0 01-.26-1.431l1.296-2.247a1.125 1.125 0 011.37-.49l1.217.456c.355.133.75.072 1.076-.124.072-.044.146-.087.22-.128.332-.183.582-.495.645-.87l.213-1.281z" /><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                </button>
+            </div>
+            <div class="result-image-container" title="Haz clic para comparar y ajustar">
+                <img src="${resultUrl}" class="result-image" alt="Resultado para ${fileName}">
+            </div>
+            <a href="#" class="btn btn-secondary download-individual-btn">Descargar JPG</a>`;
+        DOM.resultContainer.appendChild(card);
+    }
+    
+    DOM.resultContainer.addEventListener('click', e => {
+        const card = e.target.closest('.result-card');
+        if (!card) return;
+
+        const resultItem = resultDataStore.find(item => item.fileId === card.dataset.fileId);
+        if (!resultItem) return;
+
+        if (e.target.closest('.adjust-btn') || e.target.closest('.result-image-container')) {
+            openStudioModal(resultItem);
+        } else if (e.target.closest('.download-individual-btn')) {
+            e.preventDefault();
+            downloadIndividual(e.target.closest('.download-individual-btn'), resultItem);
+        }
+    });
+
+    async function applyAdjustmentsToBlob(blob, adjustments) {
+        const img = await createImageBitmap(blob);
+        const canvas = document.createElement('canvas');
+        canvas.width = img.width; canvas.height = img.height;
+        const ctx = canvas.getContext('2d');
+        const { brightness, contrast } = adjustments;
+        ctx.filter = `brightness(${brightness}%) contrast(${contrast}%)`;
+        ctx.drawImage(img, 0, 0);
+        return new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.95));
+    }
+
+    async function downloadIndividual(button, resultItem) {
+        const originalText = button.innerHTML;
+        button.innerHTML = '<span class="spinner"></span> Preparando...';
+        button.disabled = true;
+
+        const finalBlob = await applyAdjustmentsToBlob(resultItem.initialBlob, resultItem.adjustments);
+        const url = URL.createObjectURL(finalBlob);
+        
+        const link = document.createElement('a');
+        link.href = url;
+        
+        const baseName = sanitizeFileName(DOM.applyReliefFileNameInput.value.trim());
+        const itemIndex = resultDataStore.findIndex(item => item.fileId === resultItem.fileId);
+
+        if (baseName) {
+            const sequence = String(itemIndex + 1).padStart(2, '0');
+            link.download = `${baseName}-${sequence}.jpg`;
+        } else {
+             link.download = `RLV_${resultItem.fileName.split('.').slice(0, -1).join('.')}_ajustado.jpg`;
+        }
+
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+        
+        button.innerHTML = originalText;
+        button.disabled = false;
+    }
+
+    async function downloadAllAsZip(buttonElement) {
+        if (resultDataStore.length === 0) return;
+        const originalText = buttonElement.innerHTML;
+        buttonElement.innerHTML = '<span class="spinner"></span> Generando ZIP...';
+        buttonElement.disabled = true;
+        try {
+            const zip = new JSZip();
+            const baseName = sanitizeFileName(DOM.applyReliefFileNameInput.value.trim());
+
+            for (let i = 0; i < resultDataStore.length; i++) {
+                const item = resultDataStore[i];
+                const finalBlob = await applyAdjustmentsToBlob(item.initialBlob, item.adjustments);
+                
+                let downloadName;
+                if (baseName) {
+                    const sequence = String(i + 1).padStart(2, '0');
+                    downloadName = `${baseName}-${sequence}.jpg`;
+                } else {
+                    downloadName = `RLV_${item.fileName.split('.').slice(0, -1).join('.')}_ajustado.jpg`;
+                }
+                zip.file(downloadName, finalBlob);
+            }
+            
+            const content = await zip.generateAsync({ type: "blob" });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(content);
+            link.download = baseName ? `${baseName}_Relieves.zip` : `Pamesa_Relieves_Ajustados.zip`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(link.href);
+            showNotification('¡Éxito! Tu ZIP se ha guardado en Descargas.');
+        } catch (error) {
+            console.error('ZIP generation failed:', error);
+        } finally {
+            buttonElement.innerHTML = originalText;
+            buttonElement.disabled = false;
+        }
+    }
+    // --- END: TOOL 2 LOGIC ---
+
+
+    // --- START: TOOL 1 LOGIC: GENERATE RELIEF ---
+    setupUploadArea(DOM.heightMapUploadArea, DOM.heightMapUploader, false, (file) => {
+        if (!file) return;
+        heightMapFileName = file.name;
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            heightMapImage = new Image();
+            heightMapImage.onload = () => {
+                DOM.generateHeightMapBtn.disabled = false;
+                DOM.downloadHeightMapBtn.disabled = true;
+                DOM.sendReliefBtn.disabled = true;
+                DOM.generatedReliefResultContainer.innerHTML = '';
+                showNotification("Imagen de alturas cargada. Ajusta y pulsa 'Generar'.");
+            };
+            heightMapImage.src = e.target.result;
+        }
+        reader.readAsDataURL(file);
+    });
+    
+    [DOM.lightDirectionX, DOM.lightDirectionY, DOM.reliefIntensity].forEach(slider => {
+        slider.addEventListener('input', () => {
+            DOM.lightDirectionXValue.textContent = DOM.lightDirectionX.value;
+            DOM.lightDirectionYValue.textContent = DOM.lightDirectionY.value;
+            DOM.reliefIntensityValue.textContent = `${DOM.reliefIntensity.value}%`;
+            if (fullResHeightMapCanvas) {
+                DOM.generateHeightMapBtn.innerHTML = 'Actualizar Relieve';
+            }
+        });
+    });
+
+    DOM.generateHeightMapBtn.addEventListener('click', async () => {
+        if (!heightMapImage) return;
+
+        DOM.generateHeightMapBtn.innerHTML = '<span class="spinner"></span> Procesando...';
+        DOM.generateHeightMapBtn.disabled = true;
+
+        await new Promise(resolve => setTimeout(resolve, 50)); 
+        
+        const w = heightMapImage.width;
+        const h = heightMapImage.height;
+        
+        fullResHeightMapCanvas = document.createElement('canvas');
+        fullResHeightMapCanvas.width = w;
+        fullResHeightMapCanvas.height = h;
+        
+        const ctx = fullResHeightMapCanvas.getContext('2d');
+        ctx.drawImage(heightMapImage, 0, 0, w, h);
+
+        const imageData = ctx.getImageData(0, 0, w, h);
+        const data = imageData.data;
+        const z = [];
+        for (let i = 0; i < data.length; i += 4) {
+            z.push(data[i] / 255);
+        }
+        
+        const lightX = parseInt(DOM.lightDirectionX.value) / 100;
+        const lightY = parseInt(DOM.lightDirectionY.value) / 100;
+        const intensity = parseInt(DOM.reliefIntensity.value) / 100;
+        
+        const light = { x: lightX, y: lightY, z: 1 };
+        const length = Math.sqrt(light.x ** 2 + light.y ** 2 + light.z ** 2);
+        light.x /= length; light.y /= length; light.z /= length;
+
+        for (let y = 0; y < h; y++) {
+            for (let x = 0; x < w; x++) {
+                const i = (y * w + x) * 4;
+                const dzdx = ((x < w - 1 ? z[y * w + (x + 1)] : z[y * w + x]) - (x > 0 ? z[y * w + (x - 1)] : z[y * w + x])) * 0.5;
+                const dzdy = ((y < h - 1 ? z[(y + 1) * w + x] : z[y * w + x]) - (y > 0 ? z[(y - 1) * w + x] : z[y * w + x])) * 0.5;
+                
+                const nx = -dzdx * intensity;
+                const ny = -dzdy * intensity;
+                const nz = 1;
+
+                const nlen = Math.sqrt(nx * nx + ny * ny + nz * nz);
+                const nxn = nx / nlen, nyn = ny / nlen, nzn = nz / nlen;
+                
+                const dot = Math.max(0, nxn * light.x + nyn * light.y + nzn * light.z);
+                const shade = Math.round(dot * 255);
+                data[i] = data[i + 1] = data[i + 2] = shade;
+            }
+        }
+        ctx.putImageData(imageData, 0, 0);
+
+        const resultImgUrl = fullResHeightMapCanvas.toDataURL('image/png');
+        DOM.resultsInitialState.style.display = 'none';
+        DOM.resultContainer.style.display = 'none';
+        DOM.generatedReliefResultContainer.innerHTML = `<img src="${resultImgUrl}" alt="Relieve Generado">`;
+        DOM.generatedReliefResultContainer.style.display = 'flex';
+        
+        DOM.downloadHeightMapBtn.disabled = false;
+        DOM.sendReliefBtn.disabled = false;
+        DOM.generateHeightMapBtn.innerHTML = 'Generar';
+        DOM.generateHeightMapBtn.disabled = false;
+        showNotification("Relieve generado. ¡Listo para usar o descargar!");
+    });
+
+    DOM.downloadHeightMapBtn.addEventListener('click', () => {
+        if (!fullResHeightMapCanvas) return;
+        const link = document.createElement('a');
+        
+        const baseName = sanitizeFileName(DOM.generateReliefFileNameInput.value.trim());
+        if (baseName) {
+             link.download = `RELIEVE_${baseName}.png`;
+        } else {
+            const fileNameBase = heightMapFileName.split('.').slice(0, -1).join('.');
+            link.download = `RELIEVE_${fileNameBase}.png`;
+        }
+
+        link.href = fullResHeightMapCanvas.toDataURL('image/png');
+        link.click();
+    });
+
+    DOM.sendReliefBtn.addEventListener('click', sendReliefToApplicator);
+    // --- END: TOOL 1 LOGIC ---
+
+
+    // --- START: BRIDGE FUNCTION ---
+    function sendReliefToApplicator() {
+        if (!fullResHeightMapCanvas) return;
+
+        fullResHeightMapCanvas.toBlob(blob => {
+            const baseName = sanitizeFileName(DOM.generateReliefFileNameInput.value.trim());
+            const fileName = baseName ? `RELIEVE_${baseName}.png` : 'relieve-generado.png';
+            
+            const generatedFile = new File([blob], fileName, { type: 'image/png' });
+
+            reliefMapFile = generatedFile;
+            
+            DOM.reliefMapPreview.innerHTML = '';
+            createPreview(generatedFile, DOM.reliefMapPreview, 'relief-map-preview');
+            
+            document.querySelector('[data-tab="apply-relief"]').click();
+            
+            checkReadyState();
+            showNotification('Relieve listo para ser aplicado. Sube tus texturas.');
+            
+            document.querySelector('.control-panel-body').scrollTop = 0;
+
+        }, 'image/png');
+    }
+    // --- END: BRIDGE FUNCTION ---
+
+
+    // --- EDITING STUDIO MODAL LOGIC (Shared) ---
+    function openStudioModal(resultItem) {
+        let tempAdjustments = { ...resultItem.adjustments };
+
+        DOM.modalContent.innerHTML = `
+            <div class="modal-studio-viewer">
+                <div class="comparator interactive-mode">
+                    <img src="${resultItem.resultUrl}" alt="Imagen con Relieve" class="corrected-image">
+                    <img src="${resultItem.originalUrl}" alt="Imagen Original" class="original-image">
+                    <div class="slider"><div class="slider-handle"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 15L12 18.75 15.75 15m-7.5-6L12 5.25 15.75 9" /></svg></div></div>
+                </div>
+            </div>
+            <aside class="modal-studio-controls">
+                <h3>Estudio de Edición</h3>
+                <div class="slider-group">
+                    <label>Brillo <span class="value-display">${tempAdjustments.brightness}%</span></label>
+                    <input type="range" class="brightness-slider" min="50" max="150" value="${tempAdjustments.brightness}" step="1">
+                </div>
+                <div class="slider-group">
+                    <label>Contraste <span class="value-display">${tempAdjustments.contrast}%</span></label>
+                    <input type="range" class="contrast-slider" min="50" max="150" value="${tempAdjustments.contrast}" step="1">
+                </div>
+                <div class="modal-studio-actions">
+                    <button class="btn btn-success" id="saveModalAdjustments">Guardar Cambios</button>
+                    <button class="btn btn-secondary" id="cancelModalAdjustments">Cancelar</button>
+                </div>
+            </aside>`;
+        
+        const correctedImage = DOM.modalContent.querySelector('.corrected-image');
+        
+        const controls = DOM.modalContent.querySelector('.modal-studio-controls');
+        controls.addEventListener('input', e => {
+            if (!e.target.matches('input[type="range"]')) return;
+            const valueDisplay = e.target.previousElementSibling.querySelector('.value-display');
+            valueDisplay.textContent = `${e.target.value}%`;
+            if (e.target.classList.contains('brightness-slider')) tempAdjustments.brightness = parseInt(e.target.value);
+            if (e.target.classList.contains('contrast-slider')) tempAdjustments.contrast = parseInt(e.target.value);
+            correctedImage.style.filter = `brightness(${tempAdjustments.brightness}%) contrast(${tempAdjustments.contrast}%)`;
+        });
+        
+        document.getElementById('saveModalAdjustments').onclick = async () => {
+            resultItem.adjustments = tempAdjustments;
+            
+            const newBlob = await applyAdjustmentsToBlob(resultItem.initialBlob, resultItem.adjustments);
+            const newUrl = URL.createObjectURL(newBlob);
+            
+            const cardImg = document.querySelector(`.result-card[data-file-id="${resultItem.fileId}"] .result-image`);
+            if (cardImg) {
+                URL.revokeObjectURL(cardImg.src); 
+                cardImg.src = newUrl;
+                resultItem.resultUrl = newUrl;
+                generatedObjectUrls.push(newUrl);
+            }
+            closeAllModals();
+        };
+        document.getElementById('cancelModalAdjustments').onclick = closeAllModals;
+
+        initializeComparator(DOM.modalContent.querySelector('.comparator'));
+        DOM.comparatorModal.style.display = 'flex';
+        document.body.classList.add('modal-open');
+    }
+
+    function initializeComparator(comparator) {
+        const topImage = comparator.querySelector('.original-image');
+        const slider = comparator.querySelector('.slider');
+        let isDragging = false;
+        const updateSliderPosition = (x) => {
+            const rect = comparator.getBoundingClientRect();
+            const percentage = Math.max(0, Math.min((x - rect.left) / rect.width, 1)) * 100;
+            requestAnimationFrame(() => {
+                topImage.style.clipPath = `inset(0 ${100 - percentage}% 0 0)`;
+                slider.style.left = `${percentage}%`;
+            });
+        };
+        comparator.addEventListener('pointerdown', e => { e.preventDefault(); isDragging = true; });
+        window.addEventListener('pointerup', () => isDragging = false);
+        window.addEventListener('pointermove', e => { if (isDragging) updateSliderPosition(e.clientX); });
+    }
+
+    // --- START: PLACEMENT VIEW LOGIC (ENHANCED) ---
+    function calculateLayoutOptions(count) {
+        const factors = new Set();
+        for (let i = 1; i <= Math.sqrt(count); i++) {
+            if (count % i === 0) {
+                const factor1 = i;
+                const factor2 = count / i;
+                factors.add(`${factor1}x${factor2}`);
+                factors.add(`${factor2}x${factor1}`);
+            }
+        }
+        return Array.from(factors);
+    }
+
+    function openLayoutSelectionModal(options, pieces, format, baseName) {
+        const container = document.getElementById('layoutOptionsContainer');
+        container.innerHTML = '';
+        
+        // Store data on the modal itself for the custom generator button to access
+        DOM.layoutSelectionModal.dataset.format = format;
+        DOM.layoutSelectionModal.dataset.baseName = baseName;
+        window.tempPieces = pieces; // Use a temporary global to pass the object array
+
+        options.forEach(option => {
+            const btn = document.createElement('button');
+            btn.className = 'btn btn-secondary';
+            btn.textContent = option.replace('x', ' × ');
+            btn.addEventListener('click', () => {
+                closeAllModals();
+                openPlacementModal(pieces, format, baseName, option);
+            });
+            container.appendChild(btn);
+        });
+
+        DOM.customColsInput.value = '';
+        DOM.customRowsInput.value = '';
+        DOM.layoutSelectionModal.style.display = 'flex';
+        document.body.classList.add('modal-open');
+    }
+
+    function openPlacementModal(pieces, format, baseName, layout) {
+        DOM.placementGrid.innerHTML = '';
+        const [cols] = layout.split('x').map(Number);
+        DOM.placementGrid.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
+        
+        const shuffledPieces = [...pieces].sort(() => Math.random() - 0.5);
+
+        shuffledPieces.forEach(piece => {
+            const img = document.createElement('img');
+            img.src = piece.resultUrl; // Use resultUrl which is the object URL
+            // NO ROTATION is applied to preserve relief integrity
+            DOM.placementGrid.appendChild(img);
+        });
+
+        DOM.downloadPlacementBtn.dataset.format = format;
+        DOM.downloadPlacementBtn.dataset.baseName = baseName;
+        DOM.placementModal.style.display = 'flex';
+        document.body.classList.add('modal-open');
+    }
+
+    DOM.generateCustomLayoutBtn.addEventListener('click', () => {
+        const cols = parseInt(DOM.customColsInput.value, 10);
+        const rows = parseInt(DOM.customRowsInput.value, 10);
+
+        if (isNaN(cols) || isNaN(rows) || cols <= 0 || rows <= 0) {
+            showNotification('Por favor, introduce un número válido de filas y columnas.', 'error');
+            return;
+        }
+
+        const pieces = window.tempPieces;
+        const format = DOM.layoutSelectionModal.dataset.format;
+        const baseName = DOM.layoutSelectionModal.dataset.baseName;
+        
+        if (!pieces) {
+             showNotification('Error: No se encontraron imágenes para la colocación.', 'error');
+             return;
+        }
+
+        closeAllModals();
+        openPlacementModal(pieces, format, baseName, `${cols}x${rows}`);
+    });
+
+
+    async function handleDownloadPlacement() {
+        const button = DOM.downloadPlacementBtn;
+        const originalText = button.textContent;
+        button.innerHTML = `<span class="spinner"></span> <span>Generando...</span>`;
+        button.disabled = true;
+        try {
+            const canvas = await html2canvas(DOM.placementGrid, {
+                backgroundColor: '#1a1a1a',
+                useCORS: true,
+                scale: 1
+            });
+            const format = button.dataset.format;
+            const baseNameRaw = button.dataset.baseName || 'Pamesa';
+            const baseName = baseNameRaw.endsWith('-') ? baseNameRaw.slice(0, -1) : baseNameRaw;
+            const fileName = `colocacion_${baseName}_${format}.jpg`;
+            
+            const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.9));
+            
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = fileName;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(link.href);
+            showNotification('¡Éxito! Tu imagen JPG se ha guardado.');
+        } catch (error) {
+            console.error("Error al generar la imagen del panel:", error);
+            showNotification("Hubo un error al generar la imagen.", 'error');
+        } finally {
+            button.innerHTML = originalText;
+            button.disabled = false;
+        }
+    }
+    // --- END: PLACEMENT VIEW LOGIC ---
+
+
+    // --- UTILITIES AND CLEANUP (Shared) ---
+    function resetData() {
+        resultDataStore = [];
+        generatedObjectUrls.forEach(url => URL.revokeObjectURL(url));
+        generatedObjectUrls = [];
+        window.tempPieces = null;
+    }
+
+    function resetApplication() {
+        // Reset Tool 2 (Apply)
+        reliefMapFile = null;
+        baseTextureFiles = [];
+        DOM.reliefMapPreview.innerHTML = '';
+        DOM.baseTexturePreview.innerHTML = '';
+        DOM.resultContainer.innerHTML = '';
+        DOM.globalDownloadContainer.innerHTML = '';
+        DOM.fusionIntensitySlider.value = 100;
+        DOM.fusionIntensityValue.textContent = '100%';
+        DOM.applyReliefFileNameInput.value = '';
+        DOM.applyReliefFileNamePreview.textContent = 'Se usará el nombre de cada textura original.';
+        resetData();
+        checkReadyState();
+
+        // Reset Tool 1 (Generate)
+        heightMapImage = null;
+        fullResHeightMapCanvas = null;
+        heightMapFileName = '';
+        DOM.heightMapUploader.value = '';
+        DOM.generateHeightMapBtn.disabled = true;
+        DOM.generateHeightMapBtn.innerHTML = 'Generar';
+        DOM.downloadHeightMapBtn.disabled = true;
+        DOM.sendReliefBtn.disabled = true;
+        DOM.generatedReliefResultContainer.innerHTML = '';
+        DOM.lightDirectionX.value = -100;
+        DOM.lightDirectionY.value = -100;
+        DOM.reliefIntensity.value = 100;
+        DOM.lightDirectionXValue.textContent = '-100';
+        DOM.lightDirectionYValue.textContent = '-100';
+        DOM.reliefIntensityValue.textContent = '100%';
+        DOM.generateReliefFileNameInput.value = '';
+        DOM.generateReliefFileNamePreview.textContent = 'Se usará el nombre del archivo original.';
+
+        // Reset main view
+        DOM.resultsInitialState.style.display = 'flex';
+        DOM.generatedReliefResultContainer.style.display = 'none';
+        DOM.resultContainer.style.display = 'grid';
+        
+        document.querySelector('[data-tab="generate-relief"]').click();
+    }
+    
+    async function loadImage(file) {
+        const url = URL.createObjectURL(file);
+        generatedObjectUrls.push(url);
+        return new Promise((resolve, reject) => {
+            const img = new Image();
+            img.onload = () => resolve(img);
+            img.onerror = reject;
+            img.src = url;
+        });
+    }
+
+    function showNotification(message, type = 'success') {
+        clearTimeout(notificationTimeout);
+        DOM.notificationMessage.textContent = message;
+        DOM.notificationToast.style.backgroundColor = type === 'error' ? 'var(--pamesa-red)' : 'var(--pamesa-success)';
+        DOM.notificationToast.classList.add('show');
+        notificationTimeout = setTimeout(() => DOM.notificationToast.classList.remove('show'), 4000);
+    }
+
+    function closeAllModals() {
+        document.querySelectorAll('.modal').forEach(modal => modal.style.display = 'none');
+        if (DOM.modalContent) DOM.modalContent.innerHTML = '';
+        document.body.classList.remove('modal-open');
+    }
+
+    // Setup modal event listeners
+    DOM.helpBtn.addEventListener('click', () => { DOM.helpModal.style.display = 'flex'; document.body.classList.add('modal-open'); });
+    DOM.closeHelpModalBtn.addEventListener('click', closeAllModals);
+    DOM.closeModalBtn.addEventListener('click', closeAllModals);
+    DOM.downloadPlacementBtn.addEventListener('click', handleDownloadPlacement);
+    document.querySelectorAll('.modal-close').forEach(btn => btn.addEventListener('click', closeAllModals));
+    document.querySelectorAll('.modal').forEach(modal => {
+        modal.addEventListener('click', e => {
+            if (e.target === modal) {
+                 if (modal.id === 'placementModal') {
+                    // Special check for placement modal background click
+                    if (!e.target.closest('.modal-content-wrapper')) {
+                        closeAllModals();
+                    }
+                } else {
+                    closeAllModals();
+                }
+            }
+        });
+    });
+    document.addEventListener('keydown', e => { if (e.key === 'Escape') closeAllModals(); });
+
+    // --- START: COLOR SPACE CONVERSION ENGINE ---
+    function rgbToLab(rgb) { let r = rgb[0] / 255, g = rgb[1] / 255, b = rgb[2] / 255; r = (r > 0.04045) ? Math.pow((r + 0.055) / 1.055, 2.4) : r / 12.92; g = (g > 0.04045) ? Math.pow((g + 0.055) / 1.055, 2.4) : g / 12.92; b = (b > 0.04045) ? Math.pow((b + 0.055) / 1.055, 2.4) : b / 12.92; let x = (r * 0.4124 + g * 0.3576 + b * 0.1805) / 0.95047; let y = (r * 0.2126 + g * 0.7152 + b * 0.0722) / 1.00000; let z = (r * 0.0193 + g * 0.1192 + b * 0.9505) / 1.08883; x = (x > 0.008856) ? Math.pow(x, 1/3) : (7.787 * x) + 16/116; y = (y > 0.008856) ? Math.pow(y, 1/3) : (7.787 * y) + 16/116; z = (z > 0.008856) ? Math.pow(z, 1/3) : (7.787 * z) + 16/116; return [(116 * y) - 16, 500 * (x - y), 200 * (y - z)]; }
+    function labToRgb(lab) { let y = (lab[0] + 16) / 116, x = lab[1] / 500 + y, z = y - lab[2] / 200; const x3 = x * x * x, y3 = y * y * y, z3 = z * z * z; x = (x3 > 0.008856) ? x3 : (x - 16/116) / 7.787; y = (y3 > 0.008856) ? y3 : (y - 16/116) / 7.787; z = (z3 > 0.008856) ? z3 : (z - 16/116) / 7.787; x = x * 0.95047; y = y * 1.00000; z = z * 1.08883; let r = x *  3.2406 + y * -1.5372 + z * -0.4986; let g = x * -0.9689 + y *  1.8758 + z *  0.0415; let b = x *  0.0557 + y * -0.2040 + z *  1.0570; r = (r > 0.0031308) ? 1.055 * Math.pow(r, 1/2.4) - 0.055 : 12.92 * r; g = (g > 0.0031308) ? 1.055 * Math.pow(g, 1/2.4) - 0.055 : 12.92 * g; b = (b > 0.0031308) ? 1.055 * Math.pow(b, 1/2.4) - 0.055 : 12.92 * b; return [Math.max(0, Math.min(255, r * 255)), Math.max(0, Math.min(255, g * 255)), Math.max(0, Math.min(255, b * 255))]; }
+    // --- END: COLOR SPACE CONVERSION ENGINE ---
+});
+</script>
+</body>
+</html>
