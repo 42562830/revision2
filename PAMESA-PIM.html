@@ -1,0 +1,631 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PAMESA PIM | Master Data Generator</title>
+    <!-- Fuentes Corporativas -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&family=Roboto+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <!-- SheetJS -->
+    <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
+
+    <style>
+        /* ========================================= */
+        /* SISTEMA DE DISEÑO PAMESA (ADAPTADO)       */
+        /* ========================================= */
+        :root {
+            --color-principal: #ce1719;
+            --color-principal-hover: #b51517;
+            --color-fondo: #f1f5f9;
+            --color-blanco: #ffffff;
+            --color-texto-principal: #0f172a;
+            --color-texto-secundario: #64748b;
+            --color-borde-suave: #e2e8f0;
+            --color-verde: #10b981;
+            --font-main: 'Montserrat', sans-serif;
+            --font-tech: 'Roboto Mono', monospace;
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            font-family: var(--font-main);
+            background-color: var(--color-fondo);
+            color: var(--color-texto-principal);
+            height: 100vh;
+            margin: 0;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* HEADER */
+        header {
+            background: white;
+            border-bottom: 1px solid var(--color-borde-suave);
+            padding: 0 24px;
+            height: 64px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-shrink: 0;
+            z-index: 20;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+        }
+
+        .header-brand {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-weight: 800;
+            color: var(--color-principal);
+            font-size: 1.25rem;
+            letter-spacing: -0.5px;
+        }
+        
+        .header-meta {
+            font-size: 0.8rem;
+            color: var(--color-texto-secundario);
+            font-weight: 500;
+        }
+
+        /* LAYOUT PRINCIPAL */
+        #workspace {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+        }
+
+        /* SIDEBAR (INPUTS) */
+        #filters-panel {
+            width: 400px; /* Un poco más ancho para los inputs */
+            background: white;
+            border-right: 1px solid var(--color-borde-suave);
+            display: flex;
+            flex-direction: column;
+            overflow-y: auto;
+            flex-shrink: 0;
+            z-index: 10;
+        }
+
+        .sidebar-header {
+            padding: 20px 24px;
+            border-bottom: 1px solid var(--color-borde-suave);
+        }
+        .sidebar-title {
+            font-size: 0.9rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            color: var(--color-texto-principal);
+            letter-spacing: 0.05em;
+        }
+
+        .input-section {
+            padding: 24px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        /* CARD DE SUBIDA DE ARCHIVO */
+        .upload-card {
+            background: #fff;
+            border: 1px solid var(--color-borde-suave);
+            border-radius: 8px;
+            padding: 16px;
+            position: relative;
+            transition: all 0.2s;
+        }
+        .upload-card:hover {
+            border-color: #cbd5e1;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+        }
+        .upload-card.ready {
+            border-left: 4px solid var(--color-verde);
+            background: #f0fdf4;
+        }
+        .upload-card h3 {
+            margin: 0 0 4px 0;
+            font-size: 0.85rem;
+            font-weight: 700;
+            color: var(--color-texto-principal);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .upload-card p {
+            margin: 0 0 12px 0;
+            font-size: 0.75rem;
+            color: var(--color-texto-secundario);
+        }
+
+        /* CUSTOM FILE INPUT */
+        input[type="file"] {
+            font-size: 0.8rem;
+            width: 100%;
+            color: var(--color-texto-secundario);
+        }
+        input[type="file"]::file-selector-button {
+            border: 1px solid var(--color-borde-suave);
+            padding: 6px 12px;
+            border-radius: 4px;
+            background-color: #f8fafc;
+            color: var(--color-texto-principal);
+            font-weight: 600;
+            cursor: pointer;
+            margin-right: 10px;
+            transition: all 0.2s;
+        }
+        input[type="file"]::file-selector-button:hover {
+            background-color: #e2e8f0;
+        }
+
+        /* BADGES DE ESTADO */
+        .status-badge {
+            position: absolute;
+            top: 16px;
+            right: 16px;
+            font-size: 0.65rem;
+            font-weight: 700;
+            padding: 2px 8px;
+            border-radius: 99px;
+            background: #f1f5f9;
+            color: #94a3b8;
+            text-transform: uppercase;
+        }
+        .upload-card.ready .status-badge {
+            background: #dcfce7;
+            color: #166534;
+        }
+
+        /* AREA DE RESULTADOS (LOG) */
+        #results-area {
+            flex: 1;
+            background: #f8fafc;
+            display: flex;
+            flex-direction: column;
+            padding: 24px;
+            gap: 16px;
+        }
+
+        .console-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        #output-console {
+            flex: 1;
+            background: #1e293b;
+            border-radius: 8px;
+            padding: 20px;
+            font-family: var(--font-tech);
+            font-size: 0.85rem;
+            color: #4ade80;
+            overflow-y: auto;
+            border: 1px solid #334155;
+            box-shadow: inset 0 2px 4px rgba(0,0,0,0.3);
+            white-space: pre-wrap;
+            line-height: 1.5;
+        }
+        #output-console::-webkit-scrollbar { width: 8px; }
+        #output-console::-webkit-scrollbar-thumb { background: #475569; border-radius: 4px; }
+
+        /* BOTONES DE ACCIÓN */
+        .action-group {
+            margin-top: auto; /* Empuja al fondo del sidebar */
+            padding: 24px;
+            border-top: 1px solid var(--color-borde-suave);
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            background: #f8fafc;
+        }
+
+        .btn {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 8px;
+            padding: 12px 16px;
+            border-radius: 6px;
+            font-size: 0.9rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            border: 1px solid transparent;
+            width: 100%;
+        }
+
+        .btn-primary {
+            background-color: var(--color-principal);
+            color: white;
+            box-shadow: 0 4px 6px -1px rgba(206, 23, 25, 0.2);
+        }
+        .btn-primary:hover:not(:disabled) {
+            background-color: var(--color-principal-hover);
+            transform: translateY(-1px);
+        }
+        .btn-primary:disabled {
+            background-color: #94a3b8;
+            cursor: not-allowed;
+            box-shadow: none;
+        }
+
+        .btn-success {
+            background-color: var(--color-verde);
+            color: white;
+            box-shadow: 0 4px 6px -1px rgba(16, 185, 129, 0.2);
+            display: none; /* Oculto inicialmente */
+        }
+        .btn-success:hover {
+            background-color: #059669;
+            transform: translateY(-1px);
+        }
+
+        .separator {
+            height: 1px;
+            background: var(--color-borde-suave);
+            margin: 20px 0;
+        }
+        .category-label {
+            font-size: 0.7rem;
+            font-weight: 700;
+            color: #94a3b8;
+            margin-bottom: 12px;
+            text-transform: uppercase;
+        }
+
+    </style>
+</head>
+<body>
+
+    <!-- HEADER -->
+    <header>
+        <div class="header-brand">
+            <!-- Icono sencillo SVG -->
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2" ry="2"></rect><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"></path></svg>
+            PAMESA PIM
+        </div>
+        <div class="header-meta">
+            v4.0 | Master Data Generator
+        </div>
+    </header>
+
+    <div id="workspace">
+        
+        <!-- SIDEBAR: INPUTS -->
+        <aside id="filters-panel">
+            <div class="sidebar-header">
+                <div class="sidebar-title">Fuentes de Datos</div>
+            </div>
+
+            <div class="input-section">
+                
+                <div class="category-label">Diccionarios Auxiliares</div>
+
+                <!-- MODELO -->
+                <div class="upload-card" id="cardModelo">
+                    <span class="status-badge" id="badgeModelo">Pendiente</span>
+                    <h3>1. Modelo</h3>
+                    <p>Archivo: <code>MODELO.xlsx</code></p>
+                    <input type="file" id="fileModelo" accept=".xlsx" />
+                </div>
+
+                <!-- COLOR -->
+                <div class="upload-card" id="cardColor">
+                    <span class="status-badge" id="badgeColor">Pendiente</span>
+                    <h3>2. Color</h3>
+                    <p>Archivo: <code>COLOR.xlsx</code></p>
+                    <input type="file" id="fileColor" accept=".xlsx" />
+                </div>
+
+                <!-- FORMATO -->
+                <div class="upload-card" id="cardFormato">
+                    <span class="status-badge" id="badgeFormato">Pendiente</span>
+                    <h3>3. Formato</h3>
+                    <p>Archivo: <code>FORMATO.xlsx</code></p>
+                    <input type="file" id="fileFormato" accept=".xlsx" />
+                </div>
+
+                <div class="separator"></div>
+                <div class="category-label">Fuente Principal</div>
+
+                <!-- ERP -->
+                <div class="upload-card" id="cardErp">
+                    <span class="status-badge" id="badgeErp">Pendiente</span>
+                    <h3>4. Listado ERP</h3>
+                    <p>El export principal del sistema.</p>
+                    <input type="file" id="fileERP" accept=".xlsx" />
+                </div>
+
+            </div>
+
+            <!-- ACTION GROUP (FIXED BOTTOM) -->
+            <div class="action-group">
+                <button id="btnProcess" class="btn btn-primary" disabled>
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"></path></svg>
+                    Procesar Datos
+                </button>
+                <button id="btnDownload" class="btn btn-success">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                    Descargar Master (.xlsx)
+                </button>
+            </div>
+        </aside>
+
+        <!-- MAIN AREA: LOGS -->
+        <main id="results-area">
+            <div class="console-header">
+                <h2 style="font-size: 1rem; font-weight: 700; color: #334155; margin:0;">Registro de Actividad</h2>
+                <div class="count-pill">Sistema Listo</div>
+            </div>
+            
+            <div id="output-console">Esperando archivos de entrada...
+> Por favor, carga los 3 diccionarios y el archivo ERP en el panel izquierdo.
+            </div>
+        </main>
+    </div>
+
+    <script>
+        /* ========================================= */
+        /* LÓGICA DE NEGOCIO (Javascript PIM)        */
+        /* ========================================= */
+        
+        const BASE_URL_IMG = "https://www.pamesa.com/ERP/4.0/empresas/151/045/imagenes/t00010602/";
+
+        let rawDataERP = [];
+        let lookupModelos = {};   
+        let lookupColores = {};   
+        let lookupFormatos = {};  
+        let state = { modelo: false, color: false, formato: false, erp: false };
+        let finalDataAOA = [];
+
+        // DOM Elements
+        const btnProcess = document.getElementById('btnProcess');
+        const btnDownload = document.getElementById('btnDownload');
+        const outputLog = document.getElementById('output-console');
+
+        // Headers Finales
+        const TARGET_HEADERS_STRING = `Familia	Formato	Color	Modelo		Imagen	Desc._Familia	Desc._Articulo	Estado	Tarifa	Tarifa_Cial.	PV_Calidad_100	Grupo_Tarifa	Desc._Caja	Desc._Marca	Desc._Envase	EAN13		Cod._SASO	UM	Pz/Caja	M2/Caja	Cj/Pallet	M2/Pallet	Kg/Caja	Kg/Pallet	Largo_PL_cm	Ancho_PL_cm	Alto_PL_cm	Remontable	Espesor_(mm)	Fecha_de_alta	Desc._Marca_web	Desc._Serie_promo	Desc._Familia_web	Id._Articulo	Moodboard	Coleccion_web	Serie_web	Efecto_web	Gama_web	Tipo_de_uso	Tipo_complementario	Tipo_clasificacion	Acabado_pieza_web	Variacion_cromatica	Relieve_web	Relieve	Texturizado	Graficas	UNE-EN_ISO_10545-7	UNE_41901:2017_EX	Deslizamiento_DIN_51130	DIN_51097	Grupo_B(X)_UNE-EN_14411	Tipo_baldosa	PTV_(DRY)	PTV_(WET)	UPEC	DCOF_ANSI_A326.3	Resistencia_flexion	Marca_web	Ref._Catalogo	Formato	Catalogo_web	URL_imagen_PIM	Estado_PIM	Ancho	Alto	Espesor_mm	area	Medida	Nombre	Color_ok	Imagen_web	Num_Pagina`;
+        const TARGET_HEADERS = TARGET_HEADERS_STRING.split('\t');
+
+        // --- UTILITIES ---
+        function log(msg) {
+            const now = new Date().toLocaleTimeString();
+            outputLog.innerText += `\n[${now}] ${msg}`;
+            outputLog.scrollTop = outputLog.scrollHeight; // Auto scroll
+        }
+
+        function checkReady() {
+            if (state.modelo && state.color && state.formato && state.erp) {
+                btnProcess.disabled = false;
+                log("✅ Todos los archivos cargados. Listo para procesar.");
+            }
+        }
+
+        function updateStatus(type) {
+            state[type] = true;
+            // Busca ID: badgeModelo, cardModelo
+            const badgeId = `badge${type.charAt(0).toUpperCase() + type.slice(1)}`;
+            const cardId = `card${type.charAt(0).toUpperCase() + type.slice(1)}`;
+            
+            const badge = document.getElementById(badgeId);
+            const card = document.getElementById(cardId);
+            
+            if (badge && card) {
+                badge.innerText = "CARGADO";
+                card.classList.add('ready');
+                checkReady();
+            }
+        }
+
+        function parseNumber(val) {
+            if (typeof val === 'number') return val;
+            if (!val) return 0;
+            let str = String(val).replace(',', '.'); 
+            return parseFloat(str) || 0;
+        }
+
+        function loadSimpleDict(file, dict, type) {
+            if(!file) return;
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const wb = XLSX.read(e.target.result, {type:'array'});
+                const json = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], {header:1, defval:""});
+                for(let i=1; i<json.length; i++){
+                    let row = json[i];
+                    if(row[0]) dict[String(row[0]).trim()] = String(row[1]||"").trim();
+                }
+                log(`>> ${type.toUpperCase()} cargados: ${Object.keys(dict).length} entradas.`);
+                updateStatus(type);
+            };
+            reader.readAsArrayBuffer(file);
+        }
+
+        // --- EVENT LISTENERS ---
+
+        // 1. MODELO
+        document.getElementById('fileModelo').addEventListener('change', (e) => loadSimpleDict(e.target.files[0], lookupModelos, 'modelo'));
+        
+        // 2. COLOR
+        document.getElementById('fileColor').addEventListener('change', (e) => loadSimpleDict(e.target.files[0], lookupColores, 'color'));
+        
+        // 3. FORMATO
+        document.getElementById('fileFormato').addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if(!file) return;
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const wb = XLSX.read(e.target.result, {type:'array'});
+                const json = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], {header:1, defval:""});
+                for(let i=1; i<json.length; i++){
+                    let row = json[i];
+                    let id = String(row[0]).trim();
+                    if(id) lookupFormatos[id] = { 
+                        ancho: parseNumber(row[1]), 
+                        alto: parseNumber(row[2]), 
+                        espesor: parseNumber(row[3]) 
+                    };
+                }
+                log(`>> FORMATOS cargados: ${Object.keys(lookupFormatos).length} tipos.`);
+                updateStatus('formato');
+            };
+            reader.readAsArrayBuffer(file);
+        });
+
+        // 4. ERP
+        document.getElementById('fileERP').addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if(!file) return;
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const wb = XLSX.read(e.target.result, {type:'array'});
+                rawDataERP = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], {header:1, raw:false, defval:""});
+                log(`>> ERP Principal cargado: ${rawDataERP.length} filas.`);
+                updateStatus('erp');
+            };
+            reader.readAsArrayBuffer(file);
+        });
+
+        // --- PROCESAR ---
+        btnProcess.addEventListener('click', () => {
+            log("🚀 Iniciando procesamiento de datos...");
+            
+            let rowsData = [];
+
+            // Buscar indice ID Articulo
+            const headerRow = rawDataERP[0];
+            let SRC_IDX_ID_ARTICULO = -1;
+            headerRow.forEach((colName, idx) => {
+                let clean = String(colName).toLowerCase().replace(/[ ._]/g, "");
+                if (clean === "idarticulo") SRC_IDX_ID_ARTICULO = idx;
+            });
+            if (SRC_IDX_ID_ARTICULO === -1) {
+                SRC_IDX_ID_ARTICULO = 35; // Fallback
+                log("⚠️ Advertencia: No se encontró columna 'Id. Articulo' por nombre. Usando índice 35.");
+            }
+
+            const IDX_FORMATO = 1; 
+            const IDX_COLOR = 2;   
+            const IDX_MODELO = 3;  
+            const targetLen = TARGET_HEADERS.length; 
+
+            for(let i=1; i<rawDataERP.length; i++) {
+                let rowOrig = rawDataERP[i];
+                let rowNew = [];
+
+                // A. Copiar Originales
+                for(let j=0; j<rowOrig.length; j++){
+                    let val = rowOrig[j];
+                    if(typeof val === 'string') val = val.trim();
+                    if (j === 4 || j === 15 || j === SRC_IDX_ID_ARTICULO) val = String(val);
+                    rowNew.push(val);
+                }
+                
+                // B. Rellenar huecos (Reservamos para las 9 columnas nuevas)
+                while(rowNew.length < (targetLen - 9)) rowNew.push("");
+
+                // C. Cálculos
+                let idFormato = String(rowOrig[IDX_FORMATO]||"").trim();
+                let idColor   = String(rowOrig[IDX_COLOR]||"").trim();
+                let idModelo  = String(rowOrig[IDX_MODELO]||"").trim();
+                let idArticulo = String(rowOrig[SRC_IDX_ID_ARTICULO]||"").trim();
+
+                let dataFto = lookupFormatos[idFormato] || { ancho: 0, alto: 0, espesor: 0 };
+                let valArea = "";
+                let valMedida = "";
+
+                if (dataFto.ancho && dataFto.alto) {
+                    valArea = dataFto.ancho * dataFto.alto; 
+                    valMedida = `${dataFto.ancho}x${dataFto.alto}`;
+                }
+
+                // Push Columns
+                rowNew.push(dataFto.ancho || "");
+                rowNew.push(dataFto.alto || "");
+                rowNew.push(dataFto.espesor || "");
+                rowNew.push(valArea); 
+                rowNew.push(valMedida);
+                rowNew.push(lookupModelos[idModelo] || "NO DEFINIDO"); 
+                rowNew.push(lookupColores[idColor] || "NO DEFINIDO");  
+                
+                let urlImagen = "";
+                if (idArticulo) {
+                    idArticulo = idArticulo.replace(/\s/g, ''); 
+                    urlImagen = `${BASE_URL_IMG}${idArticulo}.jpg`;
+                }
+                rowNew.push(urlImagen);
+                rowNew.push("???"); // Num_Pagina
+
+                rowsData.push(rowNew);
+            }
+
+            // --- ORDENACIÓN ---
+            log("🔄 Ordenando filas (Colección > Serie > Área > Nombre)...");
+
+            const idxColeccion = TARGET_HEADERS.indexOf("Coleccion_web");
+            const idxSerie = TARGET_HEADERS.indexOf("Serie_web");
+            const idxArea = TARGET_HEADERS.indexOf("area");
+            const idxNombre = TARGET_HEADERS.indexOf("Nombre");
+            const idxColorOk = TARGET_HEADERS.indexOf("Color_ok");
+            const idxAcabado = TARGET_HEADERS.indexOf("Acabado_pieza_web");
+
+            rowsData.sort((a, b) => {
+                const strA = (val) => String(val || "").toLowerCase();
+                
+                let cmp = strA(a[idxColeccion]).localeCompare(strA(b[idxColeccion]));
+                if (cmp !== 0) return cmp;
+
+                cmp = strA(a[idxSerie]).localeCompare(strA(b[idxSerie]));
+                if (cmp !== 0) return cmp;
+
+                let areaA = parseFloat(a[idxArea]) || 0;
+                let areaB = parseFloat(b[idxArea]) || 0;
+                let cmpNum = areaB - areaA; // Descendente
+                if (cmpNum !== 0) return cmpNum;
+
+                cmp = strA(a[idxNombre]).localeCompare(strA(b[idxNombre]));
+                if (cmp !== 0) return cmp;
+
+                cmp = strA(a[idxColorOk]).localeCompare(strA(b[idxColorOk]));
+                if (cmp !== 0) return cmp;
+
+                return strA(a[idxAcabado]).localeCompare(strA(b[idxAcabado]));
+            });
+
+            finalDataAOA = [TARGET_HEADERS, ...rowsData];
+
+            log("✅ Proceso terminado correctamente.");
+            btnDownload.style.display = 'flex'; // Mostrar botón descarga
+        });
+
+        // --- DESCARGA ---
+        btnDownload.addEventListener('click', () => {
+            const ws = XLSX.utils.aoa_to_sheet(finalDataAOA);
+            const range = XLSX.utils.decode_range(ws['!ref']);
+            // Columnas a proteger como texto: 4(vacia), 15(EAN), 16(SASO), 33(ID)
+            const TEXT_COLS = [4, 15, 16, 33]; 
+            
+            for (let R = range.s.r; R <= range.e.r; ++R) {
+                for (let C = range.s.c; C <= range.e.c; ++C) {
+                    if (R===0) continue;
+                    if (TEXT_COLS.includes(C)) {
+                        let cellRef = XLSX.utils.encode_cell({r:R, c:C});
+                        if(ws[cellRef]) {
+                            ws[cellRef].t = 's';
+                            ws[cellRef].z = '@';
+                        }
+                    }
+                }
+            }
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, "PIM_MASTER");
+            XLSX.writeFile(wb, "PIM_Maestro_Final.xlsx");
+        });
+
+    </script>
+</body>
+</html>
