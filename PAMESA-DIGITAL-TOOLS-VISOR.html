@@ -1,0 +1,652 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Catálogo Digital Pamesa</title>
+
+    <!-- FUENTES CORPORATIVAS -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+
+    <!-- LIBRERÍAS EXTERNAS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+
+    <style>
+        /* SISTEMA DE DISEÑO PAMESA MOBILE */
+        :root {
+            --pamesa-red: #ce1719;
+            --pamesa-dark: #1e293b;
+            --pamesa-gray: #64748b;
+            --bg-page: #f8fafc;
+        }
+
+        body {
+            font-family: 'Montserrat', sans-serif;
+            background-color: var(--bg-page);
+            color: var(--pamesa-dark);
+            -webkit-tap-highlight-color: transparent;
+            overflow-x: hidden;
+        }
+
+        /* Utilidades */
+        .safe-area-bottom { padding-bottom: env(safe-area-inset-bottom, 20px); }
+        
+        /* Scroll Margin para que el header fijo no tape el título al saltar */
+        .scroll-target { scroll-margin-top: 130px; }
+
+        /* LOADER */
+        #loader-screen {
+            position: fixed;
+            inset: 0;
+            background: white;
+            z-index: 100;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            transition: opacity 0.3s ease;
+        }
+
+        /* HEADER & NAV */
+        .sticky-header {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(8px);
+            border-bottom: 1px solid #e2e8f0;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.02);
+        }
+
+        .nav-select-container {
+            position: relative;
+            background: #f1f5f9;
+            border-radius: 8px;
+            padding: 0 10px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+        }
+
+        .nav-select {
+            appearance: none;
+            background: transparent;
+            border: none;
+            font-size: 0.75rem;
+            font-weight: 700;
+            color: var(--pamesa-dark);
+            width: 100%;
+            padding-right: 20px;
+            outline: none;
+        }
+
+        /* TARJETAS DE ARTÍCULO */
+        .art-card {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+            border: 1px solid #e2e8f0;
+            display: flex;
+            overflow: hidden;
+            margin-bottom: 12px;
+            height: 110px; /* Altura fija para consistencia */
+        }
+
+        .art-thumb {
+            width: 110px;
+            height: 100%;
+            flex-shrink: 0;
+            background: #f8fafc;
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-right: 1px solid #f1f5f9;
+        }
+
+        .art-thumb img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .art-content {
+            flex: 1;
+            padding: 10px 12px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+
+        /* BADGES */
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 0.65rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            margin-right: 4px;
+            letter-spacing: 0.5px;
+        }
+        .badge-tech { background: #f0fdf4; color: #166534; border: 1px solid #bbf7d0; }
+        .badge-price { background: #fef2f2; color: #991b1b; border: 1px solid #fecaca; }
+
+        /* PACKING CARD REFINADA */
+        .packing-card {
+            background: white;
+            border: 1px solid #e2e8f0;
+            border-radius: 12px;
+            margin-bottom: 12px;
+            overflow: hidden;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+        }
+
+        .packing-header {
+            background: #f8fafc;
+            padding: 10px 16px;
+            border-bottom: 1px solid #e2e8f0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .packing-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr); /* 3 columnas */
+            gap: 1px;
+            background: #e2e8f0; /* Color de las líneas del grid */
+            padding: 1px 0 0 0; /* Borde superior */
+        }
+
+        .packing-cell {
+            background: white;
+            padding: 10px 4px;
+            text-align: center;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .pack-label { font-size: 0.55rem; color: #94a3b8; text-transform: uppercase; font-weight: 700; margin-bottom: 2px; }
+        .pack-value { font-size: 0.8rem; color: var(--pamesa-dark); font-weight: 600; }
+
+        /* SEPARADOR DE FORMATO */
+        .format-divider {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin: 24px 0 12px 0;
+            padding: 0 4px;
+        }
+        .format-line { flex: 1; height: 1px; background: #cbd5e1; }
+        .format-title { font-size: 0.8rem; font-weight: 800; color: var(--pamesa-red); text-transform: uppercase; letter-spacing: 0.05em; }
+
+        /* MODAL IMAGEN */
+        #img-modal {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.95);
+            z-index: 200;
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        .modal-active { display: flex !important; animation: fadeIn 0.2s ease-out; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+    </style>
+</head>
+
+<body>
+
+    <!-- 1. PANTALLA DE CARGA -->
+    <div id="loader-screen">
+        <div class="animate-spin rounded-full h-10 w-10 border-b-2 border-red-600 mb-4"></div>
+        <p class="text-xs font-bold text-gray-400 tracking-widest uppercase">Cargando Serie...</p>
+    </div>
+
+    <!-- 2. PANTALLA DE ERROR -->
+    <div id="error-screen" class="hidden fixed inset-0 bg-white z-50 flex flex-col items-center justify-center p-8 text-center">
+        <div class="w-16 h-16 bg-red-50 rounded-full flex items-center justify-center mb-4">
+            <i data-lucide="scan-line" class="w-8 h-8 text-red-500"></i>
+        </div>
+        <h2 class="text-xl font-bold text-gray-800 mb-2">Serie no encontrada</h2>
+        <p class="text-sm text-gray-500 mb-6 max-w-xs mx-auto">El código QR no contiene información válida o la serie no existe en la base de datos.</p>
+        <button onclick="window.location.reload()" class="bg-gray-900 text-white px-6 py-3 rounded-full text-xs font-bold uppercase tracking-wider shadow-lg">Reintentar</button>
+    </div>
+
+    <!-- 3. APP PRINCIPAL -->
+    <div id="app" class="hidden pb-12">
+        
+        <!-- HEADER FIJO CON NAVEGACIÓN -->
+        <header class="fixed top-0 left-0 right-0 z-40 sticky-header h-[110px]">
+            <!-- Top Bar -->
+            <div class="flex items-center justify-between px-4 h-[60px]">
+                <img src="LOGO-PAMESA.jpg" alt="Pamesa" class="h-6 w-auto">
+                <div class="text-right">
+                    <div class="text-[9px] text-gray-400 uppercase font-bold tracking-widest">SERIE</div>
+                    <div id="header-serie-name" class="text-base font-black text-gray-900 leading-none tracking-tight">...</div>
+                </div>
+            </div>
+
+            <!-- Navegación de Formatos -->
+            <div class="px-4 pb-3">
+                <div class="nav-select-container">
+                    <i data-lucide="ruler" class="w-3 h-3 text-gray-400 mr-2"></i>
+                    <select id="format-nav" class="nav-select">
+                        <option value="">Ver todos los formatos...</option>
+                        <!-- JS Rellena esto -->
+                    </select>
+                    <i data-lucide="chevron-down" class="w-3 h-3 text-gray-400 pointer-events-none absolute right-2"></i>
+                </div>
+            </div>
+        </header>
+
+        <!-- Spacer para el header fixed -->
+        <div class="h-[110px]"></div>
+
+        <!-- HERO INFO -->
+        <div class="bg-white p-6 mb-4 border-b border-gray-100">
+            <div class="flex items-start justify-between mb-4">
+                <div>
+                    <h1 id="hero-title" class="text-3xl font-black text-gray-900 tracking-tight leading-tight"></h1>
+                    <div id="hero-subtitle" class="text-xs font-bold text-gray-400 uppercase tracking-wider mt-1"></div>
+                </div>
+                <!-- Badge Variación Grande -->
+                <div id="var-badge-container" class="flex flex-col items-center justify-center w-10 h-10 rounded border border-gray-200 bg-gray-50">
+                    <span id="var-code" class="text-sm font-black text-gray-900">-</span>
+                    <span class="text-[6px] font-bold text-gray-400 uppercase">VAR</span>
+                </div>
+            </div>
+            
+            <!-- Resumen Técnico -->
+            <div class="flex gap-2">
+                <div class="flex-1 bg-gray-50 rounded p-2 border border-gray-100">
+                    <div class="text-[9px] font-bold text-gray-400 uppercase mb-1">Tipología</div>
+                    <div id="meta-tipo" class="text-xs font-bold text-gray-800 leading-tight">-</div>
+                </div>
+                <div class="flex-1 bg-gray-50 rounded p-2 border border-gray-100">
+                    <div class="text-[9px] font-bold text-gray-400 uppercase mb-1">Uso</div>
+                    <div id="meta-uso" class="text-xs font-bold text-gray-800 leading-tight">-</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- CONTENIDO PRINCIPAL -->
+        <main class="px-4">
+            
+            <!-- SECCIÓN ARTÍCULOS -->
+            <div id="articles-container" class="mb-10">
+                <!-- Inyectado por JS -->
+            </div>
+
+            <!-- SECCIÓN PACKING (LOGÍSTICA) -->
+            <div class="safe-area-bottom">
+                <div class="flex items-center gap-2 mb-4 border-b border-gray-200 pb-2">
+                    <i data-lucide="box" class="w-4 h-4 text-red-600"></i>
+                    <h3 class="text-xs font-black text-gray-900 uppercase tracking-widest">Logística & Packing</h3>
+                </div>
+                
+                <div id="packing-container">
+                    <!-- Inyectado por JS -->
+                </div>
+
+                <div class="text-center mt-12 mb-6 opacity-40">
+                    <img src="LOGO-PAMESA.jpg" class="h-4 mx-auto mb-2 grayscale">
+                    <p class="text-[9px]">Pamesa Cerámica S.L. &copy; 2025</p>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- MODAL IMAGEN (ZOOM) -->
+    <div id="img-modal" onclick="closeImage()">
+        <button class="absolute top-4 right-4 text-white/50 hover:text-white p-2">
+            <i data-lucide="x" class="w-8 h-8"></i>
+        </button>
+        <img id="modal-img-tag" src="" class="max-w-full max-h-[85vh] object-contain shadow-2xl rounded-sm" alt="Zoom">
+        <div class="mt-4 text-white/70 text-xs font-mono uppercase tracking-widest">Toca para cerrar</div>
+    </div>
+
+    <script>
+        // CONFIGURACIÓN GLOBAL
+        const CONFIG = {
+            csvUrl: './BD-21-11-2025.csv', 
+            encoding: 'ISO-8859-1'
+        };
+
+        // MAPEO DE COLUMNAS (Asegurado con tu feedback)
+        const COLS = {
+            SERIE: 'Serie_web',
+            COLECCION: 'Coleccion_web',
+            NOMBRE: 'Nombre',
+            MEDIDA: 'Medida',
+            ESPESOR: 'Espesor_mm',
+            COLOR: 'Color_ok',
+            ACABADO: 'Acabado_pieza_web',
+            IMAGEN: 'Imagen_web',
+            ID: 'Id._Articulo',
+            PRECIO: 'Grupo_Tarifa',
+            TIPOLOGIA: 'Desc._Familia_web',
+            USO: 'Tipo_de_uso',
+            VARIACION: 'Variacion_cromatica',
+            CLASE: 'UNE_41901:2017_EX',
+            R: 'Deslizamiento_DIN_51130',
+            AREA: 'area', // Para ordenar
+
+            // PACKING
+            PZ_CAJA: 'Pz/Caja',
+            M2_CAJA: 'M2/Caja',
+            KG_CAJA: 'Kg/Caja',
+            CJ_PALLET: 'Cj/Pallet', // A veces es Cj/Pallet o Cj/Pal
+            M2_PALLET: 'M2/Pallet',
+            KG_PALLET: 'Kg/Pallet'
+        };
+
+        let appData = { 
+            serieRows: [], 
+            serieName: '', 
+            collName: '',
+            formats: [] 
+        };
+
+        // INICIALIZACIÓN
+        document.addEventListener('DOMContentLoaded', () => {
+            initApp();
+        });
+
+        function initApp() {
+            // Leer Parametro URL
+            const params = new URLSearchParams(window.location.search);
+            const targetSerie = params.get('s') || params.get('serie'); 
+
+            if (!targetSerie) {
+                showError("No se ha especificado ninguna serie.");
+                return;
+            }
+
+            loadCSV(targetSerie.trim());
+        }
+
+        function loadCSV(filterSerie) {
+            fetch(CONFIG.csvUrl)
+                .then(r => {
+                    if(!r.ok) throw new Error("Archivo CSV no encontrado");
+                    return r.arrayBuffer();
+                })
+                .then(buffer => {
+                    const decoder = new TextDecoder(CONFIG.encoding);
+                    const csvText = decoder.decode(buffer);
+                    
+                    Papa.parse(csvText, {
+                        header: true,
+                        delimiter: ";",
+                        skipEmptyLines: true,
+                        complete: function(results) {
+                            processData(results.data, filterSerie);
+                        },
+                        error: function(err) { 
+                            showError("Error al leer datos CSV"); 
+                        }
+                    });
+                })
+                .catch(e => {
+                    console.error(e);
+                    showError("Error de conexión o archivo faltante");
+                });
+        }
+
+        function processData(allRows, targetName) {
+            const targetUpper = targetName.toUpperCase();
+            
+            // Filtrar Serie
+            appData.serieRows = allRows.filter(r => {
+                const s = r[COLS.SERIE];
+                return s && s.toUpperCase() === targetUpper;
+            });
+
+            if (appData.serieRows.length === 0) {
+                showError();
+                return;
+            }
+
+            // Datos Base
+            const first = appData.serieRows[0];
+            appData.serieName = first[COLS.SERIE];
+            appData.collName = first[COLS.COLECCION];
+
+            // Renderizado
+            renderHeader(first);
+            renderArticles();
+            renderPacking();
+            
+            // Finalizar carga
+            document.getElementById('loader-screen').classList.add('opacity-0', 'pointer-events-none');
+            document.getElementById('app').classList.remove('hidden');
+            lucide.createIcons();
+        }
+
+        function renderHeader(firstRow) {
+            // Títulos
+            document.getElementById('header-serie-name').innerText = appData.serieName;
+            document.getElementById('hero-title').innerText = appData.serieName;
+            document.getElementById('hero-subtitle').innerText = appData.collName || 'COLECCIÓN';
+            
+            // Metadatos
+            document.getElementById('meta-tipo').innerText = cleanVal(firstRow[COLS.TIPOLOGIA]) || 'No especificado';
+            document.getElementById('meta-uso').innerText = cleanVal(firstRow[COLS.USO]) || 'No especificado';
+            
+            // Variación (V1, V2...)
+            const vRaw = cleanVal(firstRow[COLS.VARIACION]).toUpperCase();
+            let vCode = 'V?';
+            if(vRaw.includes('UNIFORME')) vCode = 'V1';
+            else if(vRaw.includes('LEVE')) vCode = 'V2';
+            else if(vRaw.includes('MODERADA')) vCode = 'V3';
+            else if(vRaw.includes('ALTA')) vCode = 'V4';
+            
+            document.getElementById('var-code').innerText = vCode;
+        }
+
+        function renderArticles() {
+            const container = document.getElementById('articles-container');
+            const selectNav = document.getElementById('format-nav');
+            const rows = appData.serieRows;
+            const uniqueFormats = new Set();
+
+            // Ordenar por Área (Grande primero) -> Nombre
+            rows.sort((a, b) => {
+                const areaA = parseFloat((a[COLS.AREA] || '0').replace(',', '.'));
+                const areaB = parseFloat((b[COLS.AREA] || '0').replace(',', '.'));
+                if (areaB !== areaA) return areaB - areaA;
+                return (a[COLS.NOMBRE] || '').localeCompare(b[COLS.NOMBRE] || '');
+            });
+
+            let lastFormatKey = '';
+            let html = '';
+
+            rows.forEach(row => {
+                const medida = cleanVal(row[COLS.MEDIDA]);
+                const espesor = cleanVal(row[COLS.ESPESOR]);
+                const formatKey = `${medida}_${espesor}`;
+                const formatLabel = `${medida} (${espesor}mm)`;
+
+                // Separador de Formato y Lógica Navegación
+                if (formatKey !== lastFormatKey) {
+                    uniqueFormats.add(JSON.stringify({ key: formatKey, label: formatLabel }));
+                    
+                    html += `
+                        <div id="format-${formatKey}" class="format-divider scroll-target">
+                            <i data-lucide="ruler" class="w-4 h-4 text-red-600"></i>
+                            <span class="format-title">${medida}</span>
+                            <span class="text-[10px] font-bold text-gray-400 bg-gray-100 px-1 rounded ml-1">${espesor}mm</span>
+                            <div class="format-line"></div>
+                        </div>
+                    `;
+                    lastFormatKey = formatKey;
+                }
+
+                // Datos Artículo
+                const img = row[COLS.IMAGEN];
+                const hasImg = img && img.length > 5;
+                const nombre = cleanVal(row[COLS.NOMBRE]);
+                const color = cleanVal(row[COLS.COLOR]);
+                const acabado = cleanVal(row[COLS.ACABADO]);
+                const precio = cleanVal(row[COLS.PRECIO]);
+                const id = row[COLS.ID];
+                
+                // Badges
+                let badges = '';
+                const cte = cleanVal(row[COLS.CLASE]);
+                const r = cleanVal(row[COLS.R]);
+                if(cte) badges += `<span class="badge badge-tech">CTE ${cte}</span>`;
+                if(r) badges += `<span class="badge badge-tech">R${r.replace(/R/i,'')}</span>`;
+                if(precio) badges += `<span class="badge badge-price">${precio}</span>`;
+
+                html += `
+                <div class="art-card">
+                    <div class="art-thumb" onclick="${hasImg ? `openImage('${img}')` : ''}">
+                        ${hasImg 
+                            ? `<img src="${img}" loading="lazy" alt="${nombre}">` 
+                            : `<i data-lucide="image-off" class="text-gray-300 w-6 h-6"></i>`
+                        }
+                        ${hasImg ? `<div class="absolute bottom-1 right-1 bg-black/50 p-1 rounded-full"><i data-lucide="zoom-in" class="w-3 h-3 text-white"></i></div>` : ''}
+                    </div>
+                    <div class="art-content">
+                        <div>
+                            <h3 class="font-bold text-xs text-gray-900 leading-snug mb-1 uppercase">${nombre}</h3>
+                            <p class="text-[10px] text-gray-500 font-medium">${color} • ${acabado}</p>
+                        </div>
+                        <div class="flex justify-between items-end mt-2">
+                            <div class="flex flex-wrap gap-1">${badges}</div>
+                            <span class="text-[9px] text-gray-300 font-mono">#${id}</span>
+                        </div>
+                    </div>
+                </div>
+                `;
+            });
+
+            container.innerHTML = html;
+
+            // Rellenar Navegación Desplegable
+            uniqueFormats.forEach(json => {
+                const f = JSON.parse(json);
+                const option = document.createElement('option');
+                option.value = `format-${f.key}`;
+                option.text = f.label;
+                selectNav.appendChild(option);
+            });
+
+            // Evento Navegación
+            selectNav.addEventListener('change', (e) => {
+                const targetId = e.target.value;
+                if(targetId) {
+                    const el = document.getElementById(targetId);
+                    if(el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }
+            });
+        }
+
+        function renderPacking() {
+            const container = document.getElementById('packing-container');
+            const uniquePacks = new Map();
+
+            // Extraer packings únicos
+            appData.serieRows.forEach(r => {
+                const medida = cleanVal(r[COLS.MEDIDA]);
+                const espesor = cleanVal(r[COLS.ESPESOR]);
+                const key = `${medida}_${espesor}`;
+
+                // Validar que al menos haya un dato logístico
+                if (!uniquePacks.has(key) && (r[COLS.PZ_CAJA] || r[COLS.M2_PALLET])) {
+                    uniquePacks.set(key, {
+                        medida, 
+                        espesor,
+                        pz_cj: cleanVal(r[COLS.PZ_CAJA]),
+                        m2_cj: cleanVal(r[COLS.M2_CAJA]),
+                        cj_pal: cleanVal(r[COLS.CJ_PALLET]),
+                        m2_pal: cleanVal(r[COLS.M2_PALLET]),
+                        kg_cj: cleanVal(r[COLS.KG_CAJA]),
+                        kg_pal: cleanVal(r[COLS.KG_PALLET])
+                    });
+                }
+            });
+
+            if (uniquePacks.size === 0) {
+                container.innerHTML = '<div class="text-center text-xs text-gray-400 py-4 italic">Información logística no disponible.</div>';
+                return;
+            }
+
+            let html = '';
+            uniquePacks.forEach(p => {
+                html += `
+                <div class="packing-card">
+                    <div class="packing-header">
+                        <span class="text-xs font-black text-gray-800">${p.medida}</span>
+                        <span class="text-[10px] font-bold text-gray-500 bg-gray-100 px-2 py-0.5 rounded">${p.espesor}mm</span>
+                    </div>
+                    <div class="packing-grid">
+                        <div class="packing-cell">
+                            <span class="pack-label">Pz/Caja</span>
+                            <span class="pack-value">${p.pz_cj || '-'}</span>
+                        </div>
+                        <div class="packing-cell">
+                            <span class="pack-label">M2/Caja</span>
+                            <span class="pack-value">${p.m2_cj || '-'}</span>
+                        </div>
+                        <div class="packing-cell">
+                            <span class="pack-label">Kg/Caja</span>
+                            <span class="pack-value">${p.kg_cj || '-'}</span>
+                        </div>
+                        <div class="packing-cell">
+                            <span class="pack-label">Cj/Pallet</span>
+                            <span class="pack-value">${p.cj_pal || '-'}</span>
+                        </div>
+                        <div class="packing-cell">
+                            <span class="pack-label">M2/Pallet</span>
+                            <span class="pack-value">${p.m2_pal || '-'}</span>
+                        </div>
+                        <div class="packing-cell">
+                            <span class="pack-label">Kg/Pallet</span>
+                            <span class="pack-value">${p.kg_pal || '-'}</span>
+                        </div>
+                    </div>
+                </div>
+                `;
+            });
+            container.innerHTML = html;
+        }
+
+        // UTILIDADES
+        function cleanVal(val) { return (val === null || val === undefined) ? '' : String(val).trim(); }
+
+        function showError(msg) {
+            document.getElementById('loader-screen').classList.add('hidden');
+            const err = document.getElementById('error-screen');
+            err.classList.remove('hidden');
+            if(msg) err.querySelector('p').innerText = msg;
+        }
+
+        function openImage(url) {
+            const modal = document.getElementById('img-modal');
+            const img = document.getElementById('modal-img-tag');
+            img.src = url;
+            modal.classList.add('modal-active');
+            document.body.style.overflow = 'hidden';
+        }
+
+        function closeImage() {
+            const modal = document.getElementById('img-modal');
+            modal.classList.remove('modal-active');
+            document.body.style.overflow = '';
+            setTimeout(() => img.src = '', 300);
+        }
+    </script>
+</body>
+</html>
