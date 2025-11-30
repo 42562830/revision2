@@ -15,6 +15,7 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
 
     <style>
         /* ========================================= */
@@ -409,6 +410,10 @@
             <!-- SECCIÓN: ÍNDICES PREDETERMINADOS -->
             <div class="filter-section bg-slate-50">
                 <h3><i data-lucide="book-template" class="w-3 h-3"></i> Índices Catálogo</h3>
+
+                <button id="btn-download-all" class="btn btn-green w-full mb-4 justify-center text-xs">
+                    <i data-lucide="file-spreadsheet" class="w-4 h-4"></i> Descargar Excel Completo
+                </button>
                 
                 <div class="category-label">General</div>
                 <div class="preset-grid">
@@ -1254,6 +1259,116 @@
                 timeout = setTimeout(() => func.apply(context, args), wait);
             };
         }
+
+        // 1. Añadir el listener en el DOMContentLoaded (busca esta parte en tu código y añade la línea del btn-download-all)
+document.addEventListener('DOMContentLoaded', () => {
+    // ... tus otros listeners ...
+    document.getElementById('btn-download-all').addEventListener('click', generateFullExcel);
+});
+
+// 2. Nueva Función para Generar el Excel Multicapa
+function generateFullExcel() {
+    if (STATE.data.length === 0) {
+        alert("Espera a que se carguen los datos del CSV.");
+        return;
+    }
+
+    // Mostrar loading (reutilizamos tu overlay)
+    const overlay = document.getElementById('loading-overlay');
+    const overlayTitle = overlay.querySelector('h2');
+    const overlayText = overlay.querySelector('p');
+    
+    overlay.style.display = 'flex';
+    overlayTitle.innerText = "Generando Excel Completo...";
+    overlayText.innerText = "Procesando todas las pestañas. Por favor espera.";
+
+    // Usamos setTimeout para dar tiempo al navegador a renderizar el overlay antes de bloquearse procesando
+    setTimeout(() => {
+        try {
+            // Crear nuevo libro de trabajo
+            const wb = XLSX.utils.book_new();
+
+            // Recorrer todos los PRESETS definidos
+            Object.keys(PRESETS).forEach(key => {
+                const preset = PRESETS[key];
+                
+                // --- LÓGICA DE PROCESADO (Replicada de applyFilters pero sin afectar la UI) ---
+                
+                // 1. Filtrar (Process)
+                let data = preset.process([...STATE.data]); // Usamos una copia de los datos
+                
+                // 2. Deduplicar
+                if (preset.deduplicate) {
+                    const uniqueMap = new Map();
+                    data.forEach(item => {
+                        let dedupeKey;
+                        if (typeof preset.deduplicate === 'function') {
+                            dedupeKey = preset.deduplicate(item);
+                        } else {
+                            dedupeKey = item[FIELD_MAP.nombre.key]; 
+                        }
+                        if (dedupeKey && !uniqueMap.has(dedupeKey)) {
+                            uniqueMap.set(dedupeKey, item);
+                        }
+                    });
+                    data = Array.from(uniqueMap.values());
+                }
+
+                // 3. Ordenar
+                if (preset.sort) {
+                    data.sort(preset.sort);
+                }
+
+                // --- PREPARAR DATOS PARA SHEETJS ---
+                
+                // Crear Cabeceras
+                const headers = preset.columns.map(col => {
+                    return col.type === 'field' ? FIELD_MAP[col.id].label : col.header;
+                });
+
+                // Crear Filas (Mapear datos a columnas)
+                const rows = data.map(row => {
+                    return preset.columns.map(col => {
+                        if (col.type === 'field') {
+                            return row[FIELD_MAP[col.id].key] || '';
+                        } else if (col.type === 'virtual') {
+                            return col.value(row);
+                        }
+                        return '';
+                    });
+                });
+
+                // Unir cabeceras y filas
+                const wsData = [headers, ...rows];
+
+                // Crear Hoja
+                const ws = XLSX.utils.aoa_to_sheet(wsData);
+
+                // Ajustar anchos de columna (opcional, mejora estética)
+                const colWidths = headers.map(h => ({ wch: Math.max(h.length + 5, 15) }));
+                ws['!cols'] = colWidths;
+
+                // Limpiar nombre de la pestaña (Excel no permite >31 caracteres ni ciertos símbolos)
+                let sheetName = preset.name.replace(/[\\/?*\[\]:]/g, "").substring(0, 30);
+                
+                // Añadir hoja al libro
+                XLSX.utils.book_append_sheet(wb, ws, sheetName);
+            });
+
+            // Descargar archivo
+            XLSX.writeFile(wb, "Indices_Pamesa_Completo.xlsx");
+
+        } catch (err) {
+            console.error(err);
+            alert("Hubo un error generando el Excel: " + err.message);
+        } finally {
+            // Ocultar loading
+            overlay.style.display = 'none';
+            // Restaurar textos originales del loading por si acaso
+            overlayTitle.innerText = "Cargando Catálogo...";
+        }
+    }, 100);
+}
     </script>
 </body>
 </html>
