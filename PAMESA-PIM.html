@@ -59,10 +59,7 @@
             display: flex;
             align-items: center;
             gap: 12px;
-            font-weight: 800;
-            color: var(--color-principal);
-            font-size: 1.25rem;
-            letter-spacing: -0.5px;
+            /* Eliminamos estilos de texto ya que ahora es imagen */
         }
         
         .header-meta {
@@ -285,12 +282,11 @@
     <!-- HEADER -->
     <header>
         <div class="header-brand">
-            <!-- Icono sencillo SVG -->
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2" ry="2"></rect><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"></path></svg>
-            PAMESA PIM
+            <!-- LOGO IMAGEN -->
+            <img src="LOGO-PAMESA.jpg" alt="Pamesa Cerámica" style="height: 40px; display: block;">
         </div>
         <div class="header-meta">
-            v4.0 | Master Data Generator
+            v4.4 | Master Data Generator
         </div>
     </header>
 
@@ -337,8 +333,9 @@
                 <div class="upload-card" id="cardErp">
                     <span class="status-badge" id="badgeErp">Pendiente</span>
                     <h3>4. Listado ERP</h3>
-                    <p>El export principal del sistema.</p>
-                    <input type="file" id="fileERP" accept=".xlsx" />
+                    <p>Archivo <b>.xlsx</b> o <b>.xls</b> (3 filas ocultas).</p>
+                    <!-- ACEPTAMOS .XLSX y .XLS -->
+                    <input type="file" id="fileERP" accept=".xlsx, .xls" />
                 </div>
 
             </div>
@@ -364,7 +361,7 @@
             </div>
             
             <div id="output-console">Esperando archivos de entrada...
-> Por favor, carga los 3 diccionarios y el archivo ERP en el panel izquierdo.
+> Por favor, carga los 3 diccionarios y el archivo ERP (.xlsx o .xls) en el panel izquierdo.
             </div>
         </main>
     </div>
@@ -476,15 +473,18 @@
             reader.readAsArrayBuffer(file);
         });
 
-        // 4. ERP
+        // 4. ERP (SOPORTE PARA .XLSX y .XLS + SALTO DE 3 FILAS)
         document.getElementById('fileERP').addEventListener('change', (e) => {
             const file = e.target.files[0];
             if(!file) return;
             const reader = new FileReader();
             reader.onload = (e) => {
                 const wb = XLSX.read(e.target.result, {type:'array'});
-                rawDataERP = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], {header:1, raw:false, defval:""});
-                log(`>> ERP Principal cargado: ${rawDataERP.length} filas.`);
+                // range: 3 le indica a SheetJS que empiece a leer en la fila índice 3 (que es la Fila 4 de Excel)
+                // Esto funciona igual para .xlsx y para .xls
+                rawDataERP = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], {header:1, range: 3, raw:false, defval:""});
+                
+                log(`>> ERP Principal cargado: ${rawDataERP.length} filas leídas (saltando las primeras 3).`);
                 updateStatus('erp');
             };
             reader.readAsArrayBuffer(file);
@@ -549,8 +549,19 @@
                 rowNew.push(dataFto.espesor || "");
                 rowNew.push(valArea); 
                 rowNew.push(valMedida);
-                rowNew.push(lookupModelos[idModelo] || "NO DEFINIDO"); 
-                rowNew.push(lookupColores[idColor] || "NO DEFINIDO");  
+
+                // --- LÓGICA DE NOMBRE MODIFICADA (Mallas) ---
+                let nombreFinal = lookupModelos[idModelo] || "NO DEFINIDO";
+                
+                // Aplicar sufijos según Formato
+                if (idFormato === "281") {
+                    nombreFinal += ", Malla (5)";
+                } else if (idFormato === "590") {
+                    nombreFinal += ", Malla (7)";
+                }
+
+                rowNew.push(nombreFinal); // Columna Nombre
+                rowNew.push(lookupColores[idColor] || "NO DEFINIDO");  // Columna Color_ok
                 
                 let urlImagen = "";
                 if (idArticulo) {
