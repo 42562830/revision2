@@ -696,23 +696,30 @@
                 ]
             },
 
-            // INDICE FORMATOS: Medida primero, luego nombre limpio. Ordenado por Area (Desc)
+            // INDICE FORMATOS (CORREGIDO)
             'formatos': {
                 name: 'Por Formatos (Área)',
                 process: (data) => data,
-                deduplicate: (row) => getCleanName(row).toUpperCase(),
+                
+                // CAMBIO CLAVE: La "identidad" de la fila ahora es NOMBRE + MEDIDA.
+                // Así, si el modelo existe en 5 medidas, aparecerá 5 veces (una en cada grupo de medida).
+                deduplicate: (row) => `${getCleanName(row).toUpperCase()}_${row[FIELD_MAP.medida.key]}`,
+                
                 sort: (a, b) => {
-                    // 1. Área Descendente
+                    // 1. Ordenar por Área (de mayor a menor formato)
                     const areaA = parseFloat((a[FIELD_MAP.area.key] || '0').replace(',', '.'));
                     const areaB = parseFloat((b[FIELD_MAP.area.key] || '0').replace(',', '.'));
+                    
+                    // Si el área es distinta, poner el más grande primero
                     if (areaB !== areaA) return areaB - areaA;
-                    // 2. Nombre Limpio Ascendente
+                    
+                    // 2. Si es el mismo formato, ordenar alfabéticamente por nombre
                     return getCleanName(a).localeCompare(getCleanName(b));
                 },
                 columns: [
                     { type: 'field', id: 'medida' }, 
                     { type: 'virtual', header: 'Nombre Modelo', value: (row) => getCleanName(row) }, 
-                    { type: 'field', id: 'pagina' } // USAR CAMPO PAGINA REAL
+                    { type: 'field', id: 'pagina' }
                 ]
             },
 
