@@ -447,7 +447,16 @@
                     <button class="btn-preset" data-preset="dup">DUP</button>
                     <button class="btn-preset" data-preset="antic">ANTIC</button>
                 </div>
+
+                <div class="category-label text-red-600 font-bold">NOVEDADES</div>
+                <div class="preset-grid">
+    <!-- Este es el botón nuevo -->
+                   <button class="btn-preset col-span-2 justify-center font-bold text-red-700 bg-red-50 border-red-100" data-preset="novedades25">
+                   <i data-lucide="sparkles" class="w-3 h-3 text-red-600"></i> Altas 2025 (Detallado)
+                   </button>
+                </div>
             </div>
+
 
             <!-- Filtro: TEXTO LIBRE -->
             <div class="filter-section">
@@ -696,23 +705,63 @@
                 ]
             },
 
-            // INDICE FORMATOS: Medida primero, luego nombre limpio. Ordenado por Area (Desc)
+            // INDICE FORMATOS (CORREGIDO)
             'formatos': {
                 name: 'Por Formatos (Área)',
                 process: (data) => data,
-                deduplicate: (row) => getCleanName(row).toUpperCase(),
+                
+                // CAMBIO CLAVE: La "identidad" de la fila ahora es NOMBRE + MEDIDA.
+                // Así, si el modelo existe en 5 medidas, aparecerá 5 veces (una en cada grupo de medida).
+                deduplicate: (row) => `${getCleanName(row).toUpperCase()}_${row[FIELD_MAP.medida.key]}`,
+                
                 sort: (a, b) => {
-                    // 1. Área Descendente
+                    // 1. Ordenar por Área (de mayor a menor formato)
                     const areaA = parseFloat((a[FIELD_MAP.area.key] || '0').replace(',', '.'));
                     const areaB = parseFloat((b[FIELD_MAP.area.key] || '0').replace(',', '.'));
+                    
+                    // Si el área es distinta, poner el más grande primero
                     if (areaB !== areaA) return areaB - areaA;
-                    // 2. Nombre Limpio Ascendente
+                    
+                    // 2. Si es el mismo formato, ordenar alfabéticamente por nombre
                     return getCleanName(a).localeCompare(getCleanName(b));
                 },
                 columns: [
                     { type: 'field', id: 'medida' }, 
                     { type: 'virtual', header: 'Nombre Modelo', value: (row) => getCleanName(row) }, 
-                    { type: 'field', id: 'pagina' } // USAR CAMPO PAGINA REAL
+                    { type: 'field', id: 'pagina' }
+                ]
+            },
+
+            // NUEVO PRESET: NOVEDADES 2025
+            'novedades25': {
+                name: 'Altas Novedades 2025',
+                // 1. FILTRO: Solo lo que tenga año 2025
+                process: (data) => data.filter(row => row._year === 2025),
+                
+                // 2. DEDUPLICACIÓN: Clave compuesta Nombre + Medida
+                // Esto es vital: Si un modelo sale en 2 formatos nuevos, salen las 2 filas.
+                deduplicate: (row) => `${getCleanName(row).toUpperCase()}_${row[FIELD_MAP.medida.key]}`,
+                
+                // 3. ORDEN: Colección -> Serie -> Nombre -> Medida
+                sort: (a, b) => {
+                    const colA = (a[FIELD_MAP.coleccion.key] || '').localeCompare(b[FIELD_MAP.coleccion.key] || '');
+                    if (colA !== 0) return colA;
+                    
+                    const serA = (a[FIELD_MAP.serie.key] || '').localeCompare(b[FIELD_MAP.serie.key] || '');
+                    if (serA !== 0) return serA;
+
+                    return getCleanName(a).localeCompare(getCleanName(b));
+                },
+
+                // 4. COLUMNAS ESPECÍFICAS SOLICITADAS
+                columns: [
+                    { type: 'field', id: 'coleccion' },
+                    { type: 'field', id: 'serie' },
+                    { type: 'virtual', header: 'Modelo', value: (row) => getCleanName(row) }, // Nombre limpio
+                    { type: 'field', id: 'medida' }, // Requisito: Formato
+                    { type: 'field', id: 'color' },  // Requisito: Color
+                    { type: 'field', id: 'fecha' },  // Para ver cuándo exactamente en 2025
+                    { type: 'field', id: 'pagina' }  // Contexto catálogo
                 ]
             },
 
