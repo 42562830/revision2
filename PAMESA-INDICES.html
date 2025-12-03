@@ -732,25 +732,26 @@
                 ]
             },
 
-            /// NUEVO PRESET: NOVEDADES 2025 (COMPLETO TOTAL)
+            // NUEVO PRESET: NOVEDADES 2025 (TOTALMENTE DESGLOSADO)
             'novedades25': {
                 name: 'Altas Novedades 2025 (Detallado)',
                 
                 // 1. FILTRO: Solo año 2025
                 process: (data) => data.filter(row => row._year === 2025),
                 
-                // 2. DEDUPLICACIÓN: LA MÁXIMA PRECISIÓN
-                // Ahora la clave única es: NOMBRE + MEDIDA + COLOR + ACABADO
-                // Esto asegura que si existe "Blanco Mate" y "Blanco Pulido", salgan los dos.
+                // 2. DEDUPLICACIÓN: CLAVE MAESTRA
+                // Nombre + Medida + Espesor + Color + Acabado
                 deduplicate: (row) => {
                     const nombre = getCleanName(row).toUpperCase();
                     const medida = row[FIELD_MAP.medida.key] || '';
+                    const espesor = row[FIELD_MAP.espesor.key] || ''; // <--- NUEVO
                     const color = row[FIELD_MAP.color.key] || '';
                     const acabado = row[FIELD_MAP.acabado.key] || '';
-                    return `${nombre}_${medida}_${color}_${acabado}`;
+                    
+                    return `${nombre}_${medida}_${espesor}_${color}_${acabado}`;
                 },
                 
-                // 3. ORDEN JERÁRQUICO COMPLETO
+                // 3. ORDEN JERÁRQUICO
                 sort: (a, b) => {
                     // 1. Colección
                     const colA = (a[FIELD_MAP.coleccion.key] || '').localeCompare(b[FIELD_MAP.coleccion.key] || '');
@@ -768,22 +769,27 @@
                     const medA = (a[FIELD_MAP.medida.key] || '').localeCompare(b[FIELD_MAP.medida.key] || '');
                     if (medA !== 0) return medA;
 
-                    // 5. Color
+                    // 5. Espesor (Agrupamos espesores juntos)
+                    const espA = (a[FIELD_MAP.espesor.key] || '').localeCompare(b[FIELD_MAP.espesor.key] || '');
+                    if (espA !== 0) return espA;
+
+                    // 6. Color
                     const colorA = (a[FIELD_MAP.color.key] || '').localeCompare(b[FIELD_MAP.color.key] || '');
                     if (colorA !== 0) return colorA;
 
-                    // 6. Acabado (Para diferenciar Mate de Pulido, etc.)
+                    // 7. Acabado
                     return (a[FIELD_MAP.acabado.key] || '').localeCompare(b[FIELD_MAP.acabado.key] || '');
                 },
 
-                // 4. COLUMNAS VISIBLES (Incluyendo Acabado)
+                // 4. COLUMNAS VISIBLES (Añadido Espesor)
                 columns: [
                     { type: 'field', id: 'coleccion' },
                     { type: 'field', id: 'serie' },
                     { type: 'virtual', header: 'Modelo', value: (row) => getCleanName(row) },
                     { type: 'field', id: 'medida' },
+                    { type: 'field', id: 'espesor' }, // <--- AÑADIDO VISUALMENTE
                     { type: 'field', id: 'color' },
-                    { type: 'field', id: 'acabado' }, // <--- AÑADIDO IMPRESCINDIBLE
+                    { type: 'field', id: 'acabado' },
                     { type: 'field', id: 'fecha' },
                     { type: 'field', id: 'pagina' }
                 ]
