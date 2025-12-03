@@ -447,7 +447,16 @@
                     <button class="btn-preset" data-preset="dup">DUP</button>
                     <button class="btn-preset" data-preset="antic">ANTIC</button>
                 </div>
+
+                <div class="category-label text-red-600 font-bold">NOVEDADES</div>
+                <div class="preset-grid">
+    <!-- Este es el botón nuevo -->
+                   <button class="btn-preset col-span-2 justify-center font-bold text-red-700 bg-red-50 border-red-100" data-preset="novedades25">
+                   <i data-lucide="sparkles" class="w-3 h-3 text-red-600"></i> Altas 2025 (Detallado)
+                   </button>
+                </div>
             </div>
+
 
             <!-- Filtro: TEXTO LIBRE -->
             <div class="filter-section">
@@ -719,6 +728,63 @@
                 columns: [
                     { type: 'field', id: 'medida' }, 
                     { type: 'virtual', header: 'Nombre Modelo', value: (row) => getCleanName(row) }, 
+                    { type: 'field', id: 'pagina' }
+                ]
+            },
+
+            /// NUEVO PRESET: NOVEDADES 2025 (COMPLETO TOTAL)
+            'novedades25': {
+                name: 'Altas Novedades 2025 (Detallado)',
+                
+                // 1. FILTRO: Solo año 2025
+                process: (data) => data.filter(row => row._year === 2025),
+                
+                // 2. DEDUPLICACIÓN: LA MÁXIMA PRECISIÓN
+                // Ahora la clave única es: NOMBRE + MEDIDA + COLOR + ACABADO
+                // Esto asegura que si existe "Blanco Mate" y "Blanco Pulido", salgan los dos.
+                deduplicate: (row) => {
+                    const nombre = getCleanName(row).toUpperCase();
+                    const medida = row[FIELD_MAP.medida.key] || '';
+                    const color = row[FIELD_MAP.color.key] || '';
+                    const acabado = row[FIELD_MAP.acabado.key] || '';
+                    return `${nombre}_${medida}_${color}_${acabado}`;
+                },
+                
+                // 3. ORDEN JERÁRQUICO COMPLETO
+                sort: (a, b) => {
+                    // 1. Colección
+                    const colA = (a[FIELD_MAP.coleccion.key] || '').localeCompare(b[FIELD_MAP.coleccion.key] || '');
+                    if (colA !== 0) return colA;
+                    
+                    // 2. Serie
+                    const serA = (a[FIELD_MAP.serie.key] || '').localeCompare(b[FIELD_MAP.serie.key] || '');
+                    if (serA !== 0) return serA;
+
+                    // 3. Nombre Modelo
+                    const nomA = getCleanName(a).localeCompare(getCleanName(b));
+                    if (nomA !== 0) return nomA;
+
+                    // 4. Medida
+                    const medA = (a[FIELD_MAP.medida.key] || '').localeCompare(b[FIELD_MAP.medida.key] || '');
+                    if (medA !== 0) return medA;
+
+                    // 5. Color
+                    const colorA = (a[FIELD_MAP.color.key] || '').localeCompare(b[FIELD_MAP.color.key] || '');
+                    if (colorA !== 0) return colorA;
+
+                    // 6. Acabado (Para diferenciar Mate de Pulido, etc.)
+                    return (a[FIELD_MAP.acabado.key] || '').localeCompare(b[FIELD_MAP.acabado.key] || '');
+                },
+
+                // 4. COLUMNAS VISIBLES (Incluyendo Acabado)
+                columns: [
+                    { type: 'field', id: 'coleccion' },
+                    { type: 'field', id: 'serie' },
+                    { type: 'virtual', header: 'Modelo', value: (row) => getCleanName(row) },
+                    { type: 'field', id: 'medida' },
+                    { type: 'field', id: 'color' },
+                    { type: 'field', id: 'acabado' }, // <--- AÑADIDO IMPRESCINDIBLE
+                    { type: 'field', id: 'fecha' },
                     { type: 'field', id: 'pagina' }
                 ]
             },
