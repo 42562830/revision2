@@ -1,0 +1,663 @@
+<!DOCTYPE html>
+<html lang="es" class="scroll-smooth">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PAMESA | Digital Hub AI</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Iconos Lucide -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    
+    <!-- Fuente Corporativa: Montserrat -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+    
+    <style>
+        /* --- CONFIGURACIÓN BASE --- */
+        :root {
+            --pamesa-red: #ce1719;
+            --pamesa-dark: #0f172a;
+            --bg-color: #f8fafc;
+        }
+        
+        body {
+            font-family: 'Montserrat', sans-serif;
+            background-color: var(--bg-color);
+            color: #334155;
+            -webkit-font-smoothing: antialiased;
+            overflow-x: hidden;
+        }
+
+        /* --- SCROLLBAR --- */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: #f1f5f9; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+        /* --- UTILS --- */
+        .glass-nav {
+            background: rgba(255, 255, 255, 0.85);
+            backdrop-filter: blur(16px);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.5);
+        }
+
+        /* --- SISTEMA SPOTLIGHT (PREMIUM) --- */
+        .spotlight-card {
+            position: relative;
+            background-color: rgba(255, 255, 255, 0.7);
+            border-radius: 1rem;
+            overflow: hidden;
+            padding: 1px;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .spotlight-card::before {
+            content: "";
+            position: absolute;
+            inset: 0;
+            border-radius: 1rem;
+            padding: 1px;
+            background: radial-gradient(
+                600px circle at var(--mouse-x) var(--mouse-y), 
+                rgba(206, 23, 25, 0.6), 
+                rgba(226, 232, 240, 0.6) 40%
+            );
+            mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+            -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+            -webkit-mask-composite: xor;
+            mask-composite: exclude;
+            pointer-events: none;
+            z-index: 2;
+        }
+
+        .card-inner {
+            position: relative;
+            background-color: #ffffff;
+            border-radius: 0.95rem;
+            height: 100%;
+            z-index: 1;
+        }
+
+        .card-inner::after {
+            content: "";
+            position: absolute;
+            inset: 0;
+            border-radius: 0.95rem;
+            background: radial-gradient(
+                800px circle at var(--mouse-x) var(--mouse-y), 
+                rgba(206, 23, 25, 0.04),
+                transparent 40%
+            );
+            opacity: 0;
+            transition: opacity 0.5s;
+            pointer-events: none;
+        }
+
+        .spotlight-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 20px 40px -15px rgba(0, 0, 0, 0.08);
+        }
+        .spotlight-card:hover .card-inner::after { opacity: 1; }
+
+        /* --- DARK CARDS --- */
+        .spotlight-card-dark .card-inner { background-color: #0f172a; color: white; }
+        .spotlight-card-dark::before {
+            background: radial-gradient(
+                600px circle at var(--mouse-x) var(--mouse-y), 
+                rgba(56, 189, 248, 0.5),
+                rgba(30, 41, 59, 1) 40%
+            );
+        }
+        .spotlight-card-dark .card-inner::after {
+            background: radial-gradient(
+                800px circle at var(--mouse-x) var(--mouse-y), 
+                rgba(255, 255, 255, 0.05),
+                transparent 40%
+            );
+        }
+        .spotlight-card-dark:hover { box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5); }
+
+
+        /* --- ICON BOXES --- */
+        .icon-box-glass {
+            position: relative;
+            overflow: hidden;
+            border: 1px solid rgba(0,0,0,0.05);
+            transition: all 0.3s ease;
+        }
+        .group:hover .icon-box-glass { transform: scale(1.05); }
+        
+        /* Themes Colors */
+        .theme-red { background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%); color: #2563eb; } 
+        .group:hover .theme-red { background: linear-gradient(135deg, #ce1719 0%, #991b1b 100%); color: white; border-color: transparent; }
+        .theme-green { background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%); color: #16a34a; }
+        .group:hover .theme-green { background: linear-gradient(135deg, #16a34a 0%, #15803d 100%); color: white; border-color: transparent; }
+        .theme-indigo { background: linear-gradient(135deg, #eef2ff 0%, #e0e7ff 100%); color: #4f46e5; }
+        .group:hover .theme-indigo { background: linear-gradient(135deg, #4f46e5 0%, #3730a3 100%); color: white; border-color: transparent; }
+        .theme-emerald { background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%); color: #059669; }
+        .group:hover .theme-emerald { background: linear-gradient(135deg, #059669 0%, #047857 100%); color: white; border-color: transparent; }
+        .theme-orange { background: linear-gradient(135deg, #fff7ed 0%, #ffedd5 100%); color: #ea580c; }
+        .group:hover .theme-orange { background: linear-gradient(135deg, #ea580c 0%, #c2410c 100%); color: white; border-color: transparent; }
+        .theme-slate { background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%); color: #475569; }
+        .group:hover .theme-slate { background: linear-gradient(135deg, #475569 0%, #334155 100%); color: white; border-color: transparent; }
+        .theme-pink { background: linear-gradient(135deg, #fdf2f8 0%, #fce7f3 100%); color: #db2777; }
+        .group:hover .theme-pink { background: linear-gradient(135deg, #db2777 0%, #be185d 100%); color: white; border-color: transparent; }
+        .theme-cyan { background: linear-gradient(135deg, #ecfeff 0%, #cffafe 100%); color: #0891b2; }
+        .group:hover .theme-cyan { background: linear-gradient(135deg, #0891b2 0%, #0e7490 100%); color: white; border-color: transparent; }
+        .theme-purple { background: linear-gradient(135deg, #f3e8ff 0%, #e9d5ff 100%); color: #9333ea; }
+        .group:hover .theme-purple { background: linear-gradient(135deg, #9333ea 0%, #7e22ce 100%); color: white; border-color: transparent; }
+        .theme-dark { background: rgba(255,255,255,0.1); color: white; border: 1px solid rgba(255,255,255,0.1); }
+        .group:hover .theme-dark { background: white; color: #ce1719; }
+
+        .arrow-slide { transition: transform 0.3s ease; }
+        .group:hover .arrow-slide { transform: translateX(4px) translateY(-4px); color: var(--pamesa-red); }
+        .spotlight-card-dark:hover .arrow-slide { color: #fff; }
+
+        /* --- ANIMACIONES DE ENTRADA --- */
+        .opacity-0-trans { opacity: 0; transform: translateY(20px); transition: opacity 0.6s ease-out, transform 0.6s ease-out; }
+        .opacity-0-nav { opacity: 0; transform: translateY(-100%); transition: opacity 0.6s ease-out, transform 0.6s ease-out; }
+        .reveal-visible { opacity: 1 !important; transform: translateY(0) !important; }
+
+        /* --- MODAL VIDEO --- */
+        #videoModal.open { display: flex; opacity: 1; }
+    </style>
+</head>
+<body class="flex flex-col min-h-screen">
+
+    <!-- AMBIENT GLOWS -->
+    <div class="fixed inset-0 z-[-1] overflow-hidden pointer-events-none">
+        <div class="absolute -top-[20%] -right-[10%] w-[800px] h-[800px] bg-red-600/5 rounded-full blur-[120px]"></div>
+        <div class="absolute top-[40%] -left-[10%] w-[600px] h-[600px] bg-slate-400/10 rounded-full blur-[100px]"></div>
+        <div class="absolute bottom-0 right-[20%] w-[500px] h-[500px] bg-indigo-500/5 rounded-full blur-[100px]"></div>
+    </div>
+
+    <!-- NAVBAR -->
+    <nav id="main-nav" class="fixed top-0 w-full z-50 glass-nav h-20 opacity-0-nav reveal-visible">
+        <div class="max-w-7xl mx-auto px-6 h-full flex items-center justify-between">
+            <div class="flex items-center gap-6">
+                <img src="LOGO-PAMESA.jpg" alt="Pamesa Cerámica" class="h-8 md:h-10 w-auto object-contain">
+                <div class="hidden md:flex items-center gap-4">
+                    <div class="h-8 w-px bg-slate-200"></div>
+                    <div class="flex flex-col justify-center">
+                        <span class="text-[10px] font-bold tracking-[0.2em] text-slate-400 uppercase leading-tight">
+                            Digital Ecosystem
+                        </span>
+                        <span class="text-xs font-bold text-slate-800 tracking-wide">
+                            Hub de Innovación
+                        </span>
+                    </div>
+                </div>
+            </div>
+            <div class="flex items-center gap-2 bg-white/50 border border-white/60 backdrop-blur-sm px-3 py-1.5 rounded-full shadow-sm">
+                <span class="relative flex h-2 w-2">
+                    <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                    <span class="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
+                </span>
+                <span class="text-[10px] font-bold text-slate-500 uppercase tracking-wider">v4.1 Final</span>
+            </div>
+        </div>
+    </nav>
+
+    <!-- HERO -->
+    <header id="hero-section" class="pt-36 pb-12 px-6 max-w-7xl mx-auto w-full opacity-0-trans reveal-visible">
+        <div class="max-w-3xl">
+            <h1 class="text-4xl md:text-5xl font-black text-slate-900 tracking-tight leading-[1.1] mb-6">
+                Pamesa Digital Hub <br>
+                <span class="text-transparent bg-clip-text bg-gradient-to-r from-[#ce1719] to-red-900">
+                    Todas las Herramientas IA
+                </span>
+            </h1>
+            <p class="text-lg text-slate-500 font-medium leading-relaxed max-w-2xl">
+                Bienvenido a tu centro de control digital. Aquí tienes acceso directo a todo el ecosistema: desde la gestión interna de datos y diseño técnico, hasta las plataformas de venta y los grandes eventos de marca. Todo unificado en un solo lugar.
+            </p>
+        </div>
+    </header>
+
+    <!-- MAIN CONTENT -->
+    <main id="main-content" class="flex-grow px-6 pb-24 w-full max-w-7xl mx-auto space-y-16">
+        
+        <!-- =========================================================================
+             CATEGORÍA 1: CORE DATA & OPERATIONS (Interno / Fábrica)
+             ========================================================================= -->
+        <div class="opacity-0-trans reveal-visible reveal-group">
+            <div class="flex flex-col mb-6">
+                <div class="flex items-center gap-3 mb-2">
+                    <span class="h-px w-10 bg-blue-600"></span>
+                    <h2 class="text-sm font-black text-blue-700 uppercase tracking-[0.2em]">1. Gestión de Datos y Operaciones</h2>
+                </div>
+                <p class="text-sm text-slate-400 ml-14 max-w-2xl">
+                    Herramientas internas para organizar la información. Aquí preparamos los datos, revisamos la calidad y generamos los códigos necesarios para que todo funcione.
+                </p>
+            </div>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 cards-wrapper">
+                
+                <!-- PIM Generator -->
+                <a href="https://42562830.github.io/revision2/PAMESA-PIM.html" target="_blank" class="group spotlight-card h-full block">
+                    <div class="card-inner p-6 flex flex-col h-full">
+                        <div class="flex justify-between items-start mb-4">
+                            <div class="icon-box-glass theme-red w-10 h-10 rounded-lg flex items-center justify-center">
+                                <i data-lucide="database" class="w-5 h-5"></i>
+                            </div>
+                            <i data-lucide="arrow-up-right" class="arrow-slide w-4 h-4 text-slate-300"></i>
+                        </div>
+                        <h3 class="text-base font-bold text-slate-900 mb-2">PIM Generator</h3>
+                        <p class="text-xs text-slate-500 leading-relaxed mb-4 flex-grow">
+                            Toma los datos básicos del sistema y los transforma para usarlos en catálogos y webs.
+                        </p>
+                        <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider group-hover:text-red-600 transition-colors">Entrada de Datos</span>
+                    </div>
+                </a>
+
+                <!-- Auditor -->
+                <a href="https://42562830.github.io/revision2/PAMESA-AUDITOR.html" target="_blank" class="group spotlight-card h-full block">
+                    <div class="card-inner p-6 flex flex-col h-full">
+                        <div class="flex justify-between items-start mb-4">
+                            <div class="icon-box-glass theme-green w-10 h-10 rounded-lg flex items-center justify-center">
+                                <i data-lucide="shield-check" class="w-5 h-5"></i>
+                            </div>
+                            <i data-lucide="arrow-up-right" class="arrow-slide w-4 h-4 text-slate-300"></i>
+                        </div>
+                        <h3 class="text-base font-bold text-slate-900 mb-2">Auditor de Calidad</h3>
+                        <p class="text-xs text-slate-500 leading-relaxed mb-4 flex-grow">
+                            Revisa que no falte información, fotos o ensayos técnicos antes de publicar nada.
+                        </p>
+                        <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider group-hover:text-green-600 transition-colors">Control Calidad</span>
+                    </div>
+                </a>
+
+                <!-- Indices -->
+                <a href="https://42562830.github.io/revision2/PAMESA-INDICES.html" target="_blank" class="group spotlight-card h-full block">
+                    <div class="card-inner p-6 flex flex-col h-full">
+                        <div class="flex justify-between items-start mb-4">
+                            <div class="icon-box-glass theme-indigo w-10 h-10 rounded-lg flex items-center justify-center">
+                                <i data-lucide="table-2" class="w-5 h-5"></i>
+                            </div>
+                            <i data-lucide="arrow-up-right" class="arrow-slide w-4 h-4 text-slate-300"></i>
+                        </div>
+                        <h3 class="text-base font-bold text-slate-900 mb-2">Índices Automáticos</h3>
+                        <p class="text-xs text-slate-500 leading-relaxed mb-4 flex-grow">
+                            Crea listados alfabéticos y por formato de forma automática para ahorrar tiempo.
+                        </p>
+                        <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider group-hover:text-indigo-600 transition-colors">Automatización</span>
+                    </div>
+                </a>
+
+                <!-- QR Generator -->
+                <a href="https://42562830.github.io/revision2/PAMESA-DIGITAL-TOOLS-QR.html" target="_blank" class="group spotlight-card h-full block">
+                    <div class="card-inner p-6 flex flex-col h-full">
+                        <div class="flex justify-between items-start mb-4">
+                            <div class="icon-box-glass theme-orange w-10 h-10 rounded-lg flex items-center justify-center">
+                                <i data-lucide="qr-code" class="w-5 h-5"></i>
+                            </div>
+                            <i data-lucide="arrow-up-right" class="arrow-slide w-4 h-4 text-slate-300"></i>
+                        </div>
+                        <h3 class="text-base font-bold text-slate-900 mb-2">Generador QR</h3>
+                        <p class="text-xs text-slate-500 leading-relaxed mb-4 flex-grow">
+                            Crea al instante códigos QR para pegar en los paneles de la exposición.
+                        </p>
+                        <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider group-hover:text-orange-600 transition-colors">Showroom</span>
+                    </div>
+                </a>
+
+            </div>
+        </div>
+
+        <!-- =========================================================================
+             CATEGORÍA 2: CONTRACT & SALES (Externo / Cliente)
+             ========================================================================= -->
+        <div class="opacity-0-trans reveal-visible reveal-group">
+            <div class="flex flex-col mb-6">
+                <div class="flex items-center gap-3 mb-2">
+                    <span class="h-px w-10 bg-emerald-500"></span>
+                    <h2 class="text-sm font-black text-emerald-700 uppercase tracking-[0.2em]">2. Herramientas de Venta y Contract</h2>
+                </div>
+                <p class="text-sm text-slate-400 ml-14 max-w-2xl">
+                    Todo lo que necesitas para vender y prescribir. Desde la nueva web para arquitectos hasta la app móvil para enseñar el catálogo.
+                </p>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 cards-wrapper">
+                
+                <!-- Portal Contract (Destacado) -->
+                <a href="https://42562830.github.io/web-contract/" target="_blank" class="group spotlight-card h-full block lg:col-span-2">
+                    <div class="card-inner p-6 flex flex-row gap-6 h-full items-center relative overflow-hidden">
+                         <!-- Decoración de fondo -->
+                         <div class="absolute right-0 top-0 w-32 h-32 bg-purple-100 rounded-full blur-3xl -mr-10 -mt-10 opacity-50"></div>
+                        
+                        <div class="flex-1">
+                            <div class="flex items-center gap-3 mb-3">
+                                <div class="icon-box-glass theme-purple w-10 h-10 rounded-lg flex items-center justify-center">
+                                    <i data-lucide="globe" class="w-5 h-5"></i>
+                                </div>
+                                <span class="inline-block px-2 py-0.5 rounded bg-purple-100 text-purple-700 border border-purple-200 text-[9px] font-black uppercase tracking-widest">
+                                    BETA • FLAGSHIP
+                                </span>
+                            </div>
+                            <h3 class="text-lg font-bold text-slate-900 mb-2">Portal Contract & Projects</h3>
+                            <p class="text-sm text-slate-500 leading-relaxed">
+                                La nueva web corporativa diseñada específicamente para grandes proyectos. Estructura inteligente creada para facilitar la búsqueda a los arquitectos.
+                            </p>
+                        </div>
+                        <div class="hidden md:flex items-center justify-center pr-4">
+                             <i data-lucide="arrow-right-circle" class="w-8 h-8 text-slate-200 group-hover:text-purple-600 transition-colors"></i>
+                        </div>
+                    </div>
+                </a>
+
+                <!-- Generador Prescripciones -->
+                <div class="spotlight-card group h-full flex flex-col">
+                    <div class="card-inner p-6 flex flex-col h-full relative z-10">
+                        <div class="flex justify-between items-start mb-4">
+                            <div class="icon-box-glass theme-emerald w-10 h-10 rounded-lg flex items-center justify-center">
+                                <i data-lucide="file-check-2" class="w-5 h-5"></i>
+                            </div>
+                            <i data-lucide="arrow-up-right" class="w-4 h-4 text-slate-300 opacity-50"></i>
+                        </div>
+                        <h3 class="text-base font-bold text-slate-900 mb-2">Generador Prescripciones</h3>
+                        <p class="text-xs text-slate-500 leading-relaxed mb-4 flex-grow">
+                            Crea documentos técnicos y memorias para concursos de arquitectura automáticamente.
+                        </p>
+                        <div class="grid grid-cols-2 gap-2 mt-auto">
+                            <a href="https://42562830.github.io/generador-prescripciones/v6.html" target="_blank" class="px-3 py-1.5 rounded bg-emerald-50 hover:bg-emerald-600 text-emerald-700 hover:text-white transition-all text-[9px] font-bold uppercase text-center border border-emerald-100">ABRIR APP</a>
+                            <a href="https://42562830.github.io/contrac-tool-demo/" target="_blank" class="px-3 py-1.5 rounded bg-slate-50 hover:bg-slate-800 text-slate-600 hover:text-white transition-all text-[9px] font-bold uppercase text-center border border-slate-100">+ INFO</a>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Visor Mobile -->
+                <a href="https://42562830.github.io/revision2/PAMESA-DIGITAL-TOOLS-VISOR.html?s=CORE" target="_blank" class="group spotlight-card spotlight-card-dark h-full block">
+                    <div class="card-inner p-6 flex flex-col h-full relative overflow-hidden">
+                        <div class="flex justify-between items-start mb-4 relative z-10">
+                            <div class="icon-box-glass theme-dark w-10 h-10 rounded-lg flex items-center justify-center">
+                                <i data-lucide="smartphone" class="w-5 h-5"></i>
+                            </div>
+                            <i data-lucide="play-circle" class="arrow-slide w-5 h-5 text-red-500 fill-current"></i>
+                        </div>
+                        <h3 class="text-base font-bold text-white mb-2 relative z-10">Visor Móvil Catálogo</h3>
+                        <p class="text-xs text-slate-400 leading-relaxed flex-grow relative z-10">
+                            La herramienta de bolsillo para la red comercial. Consulta stock real y enseña el catálogo desde el móvil.
+                        </p>
+                    </div>
+                </a>
+
+            </div>
+            
+            <!-- Link Contexto Catálogo Infinito -->
+            <div class="mt-4">
+                 <a href="https://42562830.github.io/revision2/PAMESA-DIGITAL-TOOLS.html" target="_blank" class="block w-full p-4 rounded-xl border border-dashed border-slate-300 hover:border-emerald-400 hover:bg-emerald-50/30 transition-all flex items-center gap-4 group">
+                    <div class="bg-slate-100 p-2 rounded-md group-hover:bg-emerald-100 transition-colors">
+                        <i data-lucide="presentation" class="w-4 h-4 text-slate-500 group-hover:text-emerald-600"></i>
+                    </div>
+                    <div class="flex flex-col md:flex-row md:items-center gap-1 md:gap-4">
+                        <span class="text-xs font-bold text-slate-700 group-hover:text-emerald-800">Ver Presentación del Concepto "Catálogo Infinito"</span>
+                        <span class="text-[10px] text-slate-400 hidden md:inline">→ Página explicativa del proyecto global de digitalización</span>
+                    </div>
+                 </a>
+            </div>
+        </div>
+
+        <!-- =========================================================================
+             CATEGORÍA 3: TECHNICAL DESIGN (Herramientas Técnicas)
+             ========================================================================= -->
+        <div class="opacity-0-trans reveal-visible reveal-group">
+            <div class="flex flex-col mb-6">
+                <div class="flex items-center gap-3 mb-2">
+                    <span class="h-px w-10 bg-slate-400"></span>
+                    <h2 class="text-sm font-black text-slate-600 uppercase tracking-[0.2em]">3. Laboratorio Técnico y Diseño</h2>
+                </div>
+                <p class="text-sm text-slate-400 ml-14 max-w-2xl">
+                    Utilidades para diseñadores y técnicos. Calcular cortes, ajustar colores o simular relieves 3D.
+                </p>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 cards-wrapper">
+                
+                <!-- Master Cutter -->
+                <a href="https://42562830.github.io/revision2/Master-Cutt-Mejorado6.html" target="_blank" class="group spotlight-card h-full block">
+                    <div class="card-inner p-6 flex flex-col h-full">
+                        <div class="flex justify-between items-start mb-4">
+                            <div class="icon-box-glass theme-slate w-10 h-10 rounded-lg flex items-center justify-center">
+                                <i data-lucide="scissors-line-dashed" class="w-5 h-5"></i>
+                            </div>
+                            <i data-lucide="arrow-up-right" class="arrow-slide w-4 h-4 text-slate-300"></i>
+                        </div>
+                        <h3 class="text-lg font-bold text-slate-900 mb-2">Master Cutter v6</h3>
+                        <p class="text-sm text-slate-500 leading-relaxed mb-4 flex-grow">
+                            Calculadora para recortar imágenes de azulejos y prepararlas para diseño.
+                        </p>
+                    </div>
+                </a>
+
+                <!-- Calibrador -->
+                <a href="https://42562830.github.io/revision2/Calibrador-de-Color.html" target="_blank" class="group spotlight-card h-full block">
+                    <div class="card-inner p-6 flex flex-col h-full">
+                        <div class="flex justify-between items-start mb-4">
+                            <div class="icon-box-glass theme-pink w-10 h-10 rounded-lg flex items-center justify-center">
+                                <i data-lucide="palette" class="w-5 h-5"></i>
+                            </div>
+                            <i data-lucide="arrow-up-right" class="arrow-slide w-4 h-4 text-slate-300"></i>
+                        </div>
+                        <h3 class="text-lg font-bold text-slate-900 mb-2">Calibrador Cromático</h3>
+                        <p class="text-sm text-slate-500 leading-relaxed mb-4 flex-grow">
+                            Herramienta para igualar el color de la pantalla con la pieza física real.
+                        </p>
+                    </div>
+                </a>
+
+                <!-- Simulador -->
+                <a href="https://42562830.github.io/revision2/Simulador-de-Relieveokconcoloacion.html" target="_blank" class="group spotlight-card h-full block">
+                    <div class="card-inner p-6 flex flex-col h-full">
+                        <div class="flex justify-between items-start mb-4">
+                            <div class="icon-box-glass theme-cyan w-10 h-10 rounded-lg flex items-center justify-center">
+                                <i data-lucide="layers" class="w-5 h-5"></i>
+                            </div>
+                            <i data-lucide="arrow-up-right" class="arrow-slide w-4 h-4 text-slate-300"></i>
+                        </div>
+                        <h3 class="text-lg font-bold text-slate-900 mb-2">Simulador Relieve 3D</h3>
+                        <p class="text-sm text-slate-500 leading-relaxed mb-4 flex-grow">
+                            Visualiza cómo incide la luz sobre las texturas y relieves de las piezas.
+                        </p>
+                    </div>
+                </a>
+            </div>
+        </div>
+
+        <!-- =========================================================================
+             CATEGORÍA 4: BRAND EXPERIENCE & EVENTOS (Marketing)
+             ========================================================================= -->
+        <div class="opacity-0-trans reveal-visible reveal-group">
+            <div class="flex flex-col mb-6">
+                <div class="flex items-center gap-3 mb-2">
+                    <span class="h-px w-10 bg-indigo-600"></span>
+                    <h2 class="text-sm font-black text-indigo-700 uppercase tracking-[0.2em]">4. Experiencia de Marca y Eventos</h2>
+                </div>
+                <p class="text-sm text-slate-400 ml-14 max-w-2xl">
+                    Proyectos donde la IA ayuda a definir la imagen de marca. Incluye la web del grupo y toda la campaña del evento "Cerámica Experience".
+                </p>
+            </div>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 cards-wrapper">
+                
+                <!-- Pamesa Grupo -->
+                <a href="https://www.pamesagrupoempresarial.com/" target="_blank" class="group spotlight-card h-full block lg:col-span-1">
+                    <div class="card-inner p-6 flex flex-col h-full">
+                        <div class="flex justify-between items-start mb-4">
+                            <div class="w-10 h-10 bg-slate-800 text-white rounded-lg flex items-center justify-center shadow-lg">
+                                <i data-lucide="layout-template" class="w-5 h-5"></i>
+                            </div>
+                            <i data-lucide="arrow-up-right" class="arrow-slide w-4 h-4 text-slate-300"></i>
+                        </div>
+                        <span class="text-[10px] font-bold text-rose-500 uppercase tracking-widest mb-1">Proyecto Génesis</span>
+                        <h3 class="text-lg font-black text-slate-900 mb-2">Web Grupo Empresarial</h3>
+                        <p class="text-xs text-slate-500 leading-relaxed">
+                            La primera web del grupo donde la estructura y el contenido fueron creados por IA.
+                        </p>
+                    </div>
+                </a>
+
+                <!-- CAMPAÑA CERAMICA EXPERIENCE (Reordenado: Sales -> Concepto -> Night) -->
+                <div class="lg:col-span-2 grid grid-cols-1 md:grid-cols-3 gap-4 p-4 rounded-2xl bg-white/40 border border-white/60 shadow-sm relative overflow-hidden">
+                    <div class="absolute inset-0 bg-gradient-to-r from-indigo-50/50 to-orange-50/50 pointer-events-none"></div>
+                    
+                    <!-- Header interno -->
+                    <div class="md:col-span-3 flex items-center gap-2 mb-1">
+                        <i data-lucide="sparkles" class="w-4 h-4 text-orange-500"></i>
+                        <span class="text-xs font-bold text-slate-600 uppercase tracking-widest">Campaña: Cerámica Experience 2026</span>
+                    </div>
+
+                    <!-- 1. SALES DECK (Presentación Comercial) - AHORA PRIMERO -->
+                    <a href="https://42562830.github.io/presentacio/" target="_blank" class="group/sub relative bg-white rounded-xl p-4 shadow-sm border border-slate-100 hover:border-indigo-200 transition-all hover:-translate-y-1">
+                        <div class="mb-2 text-indigo-500"><i data-lucide="projector" class="w-5 h-5"></i></div>
+                        <h4 class="text-sm font-bold text-slate-900 mb-1">Sales Deck</h4>
+                        <p class="text-[10px] text-slate-500 leading-tight">Presentación interactiva clave para la red comercial.</p>
+                    </a>
+
+                    <!-- 2. CONCEPTO VISUAL -->
+                    <a href="https://42562830.github.io/ceramica-experience-2026/" target="_blank" class="group/sub relative bg-white rounded-xl p-4 shadow-sm border border-slate-100 hover:border-orange-200 transition-all hover:-translate-y-1">
+                        <div class="mb-2 text-orange-500"><i data-lucide="sun" class="w-5 h-5"></i></div>
+                        <h4 class="text-sm font-bold text-slate-900 mb-1">Concepto Visual</h4>
+                        <p class="text-[10px] text-slate-500 leading-tight">Exploración creativa e ideas visuales del evento diurno.</p>
+                    </a>
+
+                    <!-- 3. NIGHT EVENT -->
+                    <a href="https://eventos.pamesagrupoempresarial.com/" target="_blank" class="group/sub relative bg-slate-900 rounded-xl p-4 shadow-sm border border-slate-700 hover:border-indigo-400 transition-all hover:-translate-y-1">
+                        <div class="mb-2 text-indigo-300"><i data-lucide="moon" class="w-5 h-5"></i></div>
+                        <h4 class="text-sm font-bold text-white mb-1">Night Event</h4>
+                        <p class="text-[10px] text-slate-400 leading-tight">Landing de registro para la fiesta exclusiva nocturna.</p>
+                    </a>
+                </div>
+
+            </div>
+        </div>
+
+        <!-- =========================================================================
+             CATEGORÍA 5: DEMOS DE VIDEO (Investigación y Desarrollo)
+             ========================================================================= -->
+        <div class="opacity-0-trans reveal-visible reveal-group">
+             <div class="flex items-center gap-3 mb-6">
+                <span class="h-px w-10 bg-slate-300"></span>
+                <h2 class="text-xs font-bold text-slate-400 uppercase tracking-[0.2em]">Demos de Video y Prototipos</h2>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <!-- Video Core Tech -->
+                <button onclick="playVideo('1141030971')" class="group spotlight-card spotlight-card-dark h-32 md:h-40 text-left w-full relative overflow-hidden block">
+                    <div class="card-inner px-6 flex items-center h-full">
+                         <div class="absolute right-0 top-0 w-64 h-full bg-gradient-to-l from-blue-900/40 to-transparent pointer-events-none"></div>
+                         <div class="w-12 h-12 bg-blue-600 rounded-full flex items-center justify-center mr-6 shrink-0 group-hover:scale-110 transition-transform">
+                             <i data-lucide="play" class="w-5 h-5 text-white fill-current ml-1"></i>
+                         </div>
+                         <div>
+                             <h3 class="text-lg font-bold text-white">Demo: Pantalla Táctil</h3>
+                             <p class="text-xs text-slate-400 mt-1">Video demostración de la interfaz para pantallas grandes.</p>
+                         </div>
+                    </div>
+                </button>
+
+                 <!-- Video UX -->
+                <button onclick="playVideo('1141032753')" class="group spotlight-card spotlight-card-dark h-32 md:h-40 text-left w-full relative overflow-hidden block">
+                    <div class="card-inner px-6 flex items-center h-full">
+                         <div class="absolute right-0 top-0 w-64 h-full bg-gradient-to-l from-cyan-900/40 to-transparent pointer-events-none"></div>
+                         <div class="w-12 h-12 bg-cyan-600 rounded-full flex items-center justify-center mr-6 shrink-0 group-hover:scale-110 transition-transform">
+                             <i data-lucide="play" class="w-5 h-5 text-white fill-current ml-1"></i>
+                         </div>
+                         <div>
+                             <h3 class="text-lg font-bold text-white">Demo: Diseño UX/UI</h3>
+                             <p class="text-xs text-slate-400 mt-1">Video sobre la arquitectura de información y navegación.</p>
+                         </div>
+                    </div>
+                </button>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- FOOTER -->
+    <footer class="bg-white/60 backdrop-blur-md border-t border-slate-200 mt-auto opacity-0-trans reveal-visible reveal-group">
+        <div class="max-w-7xl mx-auto px-6 py-12 flex flex-col md:flex-row justify-between items-center gap-6">
+            <div class="flex items-center gap-4 opacity-60 hover:opacity-100 transition-opacity">
+                <img src="LOGO-PAMESA.jpg" alt="Logo Footer" class="h-6 md:h-8 grayscale hover:grayscale-0 transition-all duration-500">
+            </div>
+            <div class="text-center md:text-right">
+                <p class="text-xs font-extrabold text-slate-900 uppercase tracking-widest mb-1">
+                    Pamesa Cerámica Compactto S.L.U.
+                </p>
+                <p class="text-[10px] text-slate-400 font-semibold uppercase tracking-wide">
+                    Dpto. Marketing & IT Systems &copy; 2025
+                </p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- VIDEO MODAL -->
+    <div id="videoModal" class="fixed inset-0 z-[100] hidden opacity-0 transition-opacity duration-300" role="dialog" aria-modal="true">
+        <div class="absolute inset-0 bg-slate-900/95 backdrop-blur-md transition-opacity" onclick="closeVideoModal()"></div>
+        <div class="relative z-10 w-full h-full flex items-center justify-center p-4">
+            <div class="relative w-full max-w-5xl bg-black rounded-2xl shadow-2xl overflow-hidden border border-slate-700">
+                <button type="button" class="absolute top-4 right-4 z-20 bg-black/50 hover:bg-red-600 text-white rounded-full p-2 transition-colors backdrop-blur-md border border-white/10" onclick="closeVideoModal()">
+                    <i data-lucide="x" class="w-6 h-6"></i>
+                </button>
+                <div style="padding:56.25% 0 0 0;position:relative;">
+                    <iframe id="vimeoIframe" src="" frameborder="0" allow="autoplay; fullscreen; picture-in-picture" style="position:absolute;top:0;left:0;width:100%;height:100%;" title="Video Player"></iframe>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- SCRIPTS -->
+    <script src="https://player.vimeo.com/api/player.js"></script>
+    <script>
+        lucide.createIcons();
+
+        // SPOTLIGHT LOGIC
+        const wrappers = document.querySelectorAll('.cards-wrapper');
+        wrappers.forEach(wrapper => {
+            wrapper.addEventListener('mousemove', (e) => {
+                const cards = wrapper.querySelectorAll('.spotlight-card');
+                cards.forEach(card => {
+                    const rect = card.getBoundingClientRect();
+                    const x = e.clientX - rect.left;
+                    const y = e.clientY - rect.top;
+                    card.style.setProperty('--mouse-x', `${x}px`);
+                    card.style.setProperty('--mouse-y', `${y}px`);
+                });
+            });
+        });
+
+        // REVEAL LOGIC
+        document.addEventListener('DOMContentLoaded', () => {
+             const sections = document.querySelectorAll('.reveal-group');
+             sections.forEach((section, index) => {
+                setTimeout(() => { section.classList.add('reveal-visible'); }, 100 + (index * 150));
+            });
+        });
+
+        // MODAL VIDEO
+        const modal = document.getElementById('videoModal');
+        const iframe = document.getElementById('vimeoIframe');
+
+        function playVideo(id) {
+            iframe.src = `https://player.vimeo.com/video/${id}?autoplay=1&title=0&byline=0&portrait=0`;
+            modal.classList.remove('hidden');
+            setTimeout(() => { modal.classList.add('open'); }, 10);
+            document.body.style.overflow = 'hidden';
+        }
+
+        function closeVideoModal() {
+            modal.classList.remove('open');
+            setTimeout(() => {
+                modal.classList.add('hidden');
+                iframe.src = "";
+            }, 300);
+            document.body.style.overflow = 'auto';
+        }
+
+        document.addEventListener('keydown', function(event) {
+            if (event.key === "Escape") { closeVideoModal(); }
+        });
+    </script>
+</body>
+</html>
