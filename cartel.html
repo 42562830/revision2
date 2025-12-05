@@ -1,0 +1,515 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>CERAMICA XP 26 | Design System V6 (Responsive)</title>
+    
+    <!-- LIBRERÍAS -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+
+    <!-- FUENTES -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet">
+
+    <style>
+        :root {
+            /* Dimensiones Reales del Poster (NO TOCAR) */
+            --w: 800px;
+            --h: 1131px;
+            
+            /* Variables iniciales */
+            --bg: #F4F4F4;
+            --fg: #111111;
+            --accent: #E83234; 
+            --line: rgba(0,0,0,0.1);
+            --logo-filter: grayscale(100%) brightness(0); 
+            --font-main: 'Inter', sans-serif;
+            --font-tech: 'Space Grotesk', monospace;
+
+            /* UI Colors */
+            --ui-bg: rgba(20, 20, 20, 0.85);
+            --ui-border: rgba(255, 255, 255, 0.1);
+            --ui-hover: rgba(255, 255, 255, 0.15);
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            background: #050505;
+            margin: 0;
+            padding: 0;
+            font-family: var(--font-main);
+            height: 100vh;
+            width: 100vw;
+            overflow: hidden; /* CRUCIAL: Prevenir scroll global */
+        }
+
+        /* --- LAYOUT PRINCIPAL (RESPONSIVE) --- */
+        .app-layout {
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+            width: 100%;
+        }
+
+        /* 1. EL ESCENARIO (Donde vive el poster) */
+        .stage {
+            flex: 1; /* Ocupa todo el espacio disponible */
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            width: 100%;
+        }
+
+        /* 2. EL POSTER (Dimensiones Fijas, se escala vía JS) */
+        #poster {
+            width: var(--w);
+            height: var(--h);
+            background: var(--bg); 
+            color: var(--fg);
+            position: relative;
+            overflow: hidden;
+            box-shadow: 0 0 50px rgba(0,0,0,0.5);
+            transition: background 0.3s, color 0.3s;
+            /* El transform se aplica vía JS */
+            flex-shrink: 0; 
+        }
+
+        /* --- UI CONTROLS (NUEVO DISEÑO) --- */
+        .controls {
+            z-index: 1000;
+            padding: 15px;
+            background: #000;
+            display: flex;
+            justify-content: center;
+            border-top: 1px solid #222;
+        }
+
+        .control-bar {
+            display: flex;
+            gap: 12px;
+            background: var(--ui-bg);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            padding: 8px;
+            border-radius: 16px;
+            border: 1px solid var(--ui-border);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            width: 100%;
+            max-width: 600px;
+            justify-content: space-between;
+        }
+
+        .btn {
+            flex: 1;
+            background: transparent;
+            color: #ccc;
+            border: 1px solid transparent;
+            padding: 12px 0;
+            border-radius: 10px;
+            font-family: var(--font-main);
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 4px;
+        }
+
+        .btn svg { width: 20px; height: 20px; fill: currentColor; margin-bottom: 2px; }
+        
+        .btn:hover { background: var(--ui-hover); color: #fff; transform: translateY(-2px); }
+        .btn:active { transform: translateY(0); }
+
+        /* Botón Principal (Remix) */
+        .btn.primary {
+            background: var(--accent);
+            color: #fff;
+            box-shadow: 0 4px 15px rgba(232, 50, 52, 0.4);
+            flex: 1.3; /* Un poco más grande */
+        }
+        .btn.primary:hover { background: #ff4d4f; }
+
+        /* Media Queries para Escritorio */
+        @media (min-width: 768px) {
+            .app-layout {
+                flex-direction: row; /* Layout horizontal en PC */
+            }
+            
+            .stage {
+                width: auto;
+                background-image: radial-gradient(#1a1a1a 1px, transparent 1px);
+                background-size: 20px 20px;
+            }
+
+            .controls {
+                position: absolute;
+                bottom: 30px;
+                left: 50%;
+                transform: translateX(-50%);
+                background: transparent;
+                border: none;
+                padding: 0;
+                width: auto;
+            }
+
+            .control-bar {
+                padding: 10px;
+                gap: 15px;
+            }
+
+            .btn {
+                flex-direction: row;
+                padding: 12px 24px;
+                font-size: 12px;
+                gap: 8px;
+            }
+            .btn svg { margin: 0; }
+        }
+
+        /* --- GRID SYSTEM & LAYERS (Originales conservados) --- */
+        .grid-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: grid; grid-template-columns: repeat(12, 1fr); grid-template-rows: repeat(12, 1fr); z-index: 10; pointer-events: none; }
+        .grid-line { position: absolute; background: var(--line); }
+        .line-v { width: 1px; height: 100%; top: 0; }
+        .line-h { width: 100%; height: 1px; left: 0; }
+        .graphic-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 5; overflow: hidden; }
+        .super-year-bg { font-family: var(--font-main); font-weight: 800; position: absolute; line-height: 0.8; color: transparent; -webkit-text-stroke: 1.5px var(--line); white-space: nowrap; opacity: 0.6; transform-origin: center; }
+        
+        .content-layer {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 20;
+            display: grid; grid-template-columns: repeat(12, 1fr); grid-template-rows: repeat(12, 1fr);
+            padding: 40px; padding-bottom: 90px;
+        }
+
+        .brand-logo { grid-column: 1 / span 12; height: 40px; display: flex; align-items: center; }
+        .brand-logo img { height: 100%; width: auto; }
+        .main-title-box { display: flex; flex-direction: column; justify-content: center; overflow: hidden; padding: 0; max-width: 100%; }
+        .fit-text { font-family: var(--font-main); font-weight: 800; text-transform: uppercase; line-height: 0.85; letter-spacing: -0.03em; margin: 0; white-space: pre-wrap; word-break: normal; overflow-wrap: normal; display: block; width: 100%; }
+        .subtitle { font-family: var(--font-tech); font-size: 18px; margin-top: 25px; text-transform: uppercase; letter-spacing: 0.1em; opacity: 0.7; border-top: 1px solid currentColor; padding-top: 10px; display: inline-block; width: fit-content; }
+        .data-block { font-family: var(--font-tech); display: flex; flex-direction: column; justify-content: flex-end; border-top: 2px solid var(--accent); padding-top: 15px; }
+        .data-row { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 5px; font-size: 16px; font-weight: 500; text-transform: uppercase; }
+        .data-big { font-size: 32px; font-weight: 700; letter-spacing: -0.02em; font-family: var(--font-main); display: block; }
+        .year-pill { background: var(--fg); color: var(--pill-text); padding: 2px 8px; border-radius: 8px; font-size: 0.6em; vertical-align: middle; margin-left: 8px; font-weight: 700; }
+        
+        .footer-logos { position: absolute; bottom: 40px; left: 40px; right: 40px; height: 20px; display: flex; flex-direction: row; justify-content: space-between; align-items: center; z-index: 30; gap: 15px; }
+        .logo-wrapper { flex: 0 0 auto; display: flex; justify-content: center; align-items: center; height: 100%; }
+        .footer-logos img { height: 100%; width: auto; max-width: 110px; object-fit: contain; filter: var(--logo-filter); opacity: 0.85; transition: filter 0.3s; }
+        .logo-ascale img { height: auto !important; width: auto; max-width: 90px !important; max-height: 100%; }
+        .noise { display: none; }
+
+        /* --- LAYOUTS CSS (Originales) --- */
+        .l-swiss .brand-logo { grid-column: 1; grid-row: 1; }
+        .l-swiss .main-title-box { grid-column: 1 / span 12; grid-row: 3 / span 6; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); padding: 20px 0; }
+        .l-swiss .data-block { grid-column: 1 / span 6; grid-row: 10 / span 2; } 
+        .l-swiss .super-year-bg { font-size: 400px; bottom: -80px; right: -50px; transform: rotate(0deg); }
+
+        .l-mod .brand-logo { grid-column: 1; grid-row: 1; }
+        .l-mod .main-title-box { grid-column: 3 / span 10; grid-row: 1 / span 10; text-align: right; justify-content: flex-start; padding-top: 100px; border-left: 1px solid var(--line); padding-left: 30px; padding-right: 40px; }
+        .l-mod .data-block { grid-column: 1 / span 4; grid-row: 10; text-align: left; }
+        .l-mod .super-year-bg { font-size: 180px; top: 40%; left: -30px; transform: rotate(-90deg); }
+
+        .l-typo .brand-logo { grid-column: 1 / span 12; grid-row: 1; justify-content: center; }
+        .l-typo .main-title-box { grid-column: 1 / span 12; grid-row: 2 / span 8; text-align: center; align-items: center; }
+        .l-typo .data-block { grid-column: 4 / span 6; grid-row: 10 / span 1; text-align: center; border-top: none; border-bottom: 4px solid var(--accent); padding-bottom: 20px;}
+        .l-typo .data-row { justify-content: center; gap: 10px; }
+        .l-typo .super-year-bg { font-size: 550px; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: -1; opacity: 0.15; -webkit-text-stroke: 0; fill: var(--fg); }
+
+        .l-asym .brand-logo { grid-column: 11 / span 2; grid-row: 1; justify-content: flex-end; }
+        .l-asym .main-title-box { grid-column: 1 / span 12; grid-row: 3 / span 7; justify-content: center; }
+        .l-asym .data-block { grid-column: 9 / span 4; grid-row: 10 / span 1; text-align: right; align-items: flex-end;}
+        .l-asym .super-year-bg { font-size: 250px; top: 10px; left: 10px; opacity: 0.3; }
+
+        .l-bottom .brand-logo { grid-column: 1 / span 12; grid-row: 1; text-align: center; justify-content: center; }
+        .l-bottom .main-title-box { grid-column: 1 / span 12; grid-row: 4 / span 8; display: flex; flex-direction: column; justify-content: center; border-top: 2px solid var(--fg); padding-top: 20px;}
+        .l-bottom .subtitle { align-self: flex-end; margin-top: auto; text-align: right; }
+        .l-bottom .data-block { grid-column: 1 / span 12; grid-row: 2; border-top: none; text-align: center; align-items: center; justify-content: center;}
+        .l-bottom .data-row { justify-content: center; gap: 20px; width: 100%; }
+        .l-bottom .super-year-bg { font-size: 300px; top: -50px; left: 50%; transform: translateX(-50%); }
+
+        .l-side-l .brand-logo { grid-column: 1 / span 4; grid-row: 1; border-bottom: 1px solid var(--line); }
+        .l-side-l .data-block { grid-column: 1 / span 3; grid-row: 2 / span 9; justify-content: flex-start; padding-top: 40px; border-top: none; border-right: 1px solid var(--line); }
+        .l-side-l .main-title-box { grid-column: 5 / span 8; grid-row: 2 / span 9; align-items: flex-start; padding-left: 20px; justify-content: center; }
+        .l-side-l .super-year-bg { font-size: 150px; bottom: 100px; left: 20px; opacity: 0.8; color: var(--fg); -webkit-text-stroke: 0; }
+
+        .l-side-r .brand-logo { grid-column: 9 / span 4; grid-row: 1; justify-content: flex-end; }
+        .l-side-r .data-block { grid-column: 10 / span 3; grid-row: 4 / span 6; border-top: 4px solid var(--accent); justify-content: center; text-align: right; }
+        .l-side-r .main-title-box { grid-column: 1 / span 9; grid-row: 1 / span 10; align-items: flex-start; justify-content: center; border-right: 1px solid var(--line); padding-right: 40px; text-align: right; }
+        .l-side-r .super-year-bg { font-size: 400px; top: 50%; right: -100px; transform: translateY(-50%) rotate(90deg); opacity: 0.1; }
+
+        .l-cross .brand-logo { grid-column: 1; grid-row: 1; }
+        .l-cross .data-block { grid-column: 8 / span 5; grid-row: 2 / span 2; text-align: right; align-items: flex-end; border-top: 1px solid var(--fg); }
+        .l-cross .main-title-box { grid-column: 1 / span 10; grid-row: 4 / span 8; justify-content: center; padding-bottom: 20px; border-left: 10px solid var(--accent); padding-left: 20px; }
+        .l-cross .super-year-bg { font-size: 200px; top: 20px; right: 20px; text-align: right; opacity: 0.5; }
+
+    </style>
+</head>
+<body>
+
+    <div class="app-layout">
+        
+        <!-- STAGE: El área donde se ve el cartel -->
+        <div class="stage" id="stage">
+            <div id="poster" class="l-swiss">
+                <div class="noise"></div>
+                <div class="graphic-layer">
+                    <div class="super-year-bg">2026</div>
+                </div>
+                <div class="grid-layer" id="gridLines"></div>
+                <div class="content-layer">
+                    <div class="brand-logo"><img id="logoImg" src="logo-ceramica-experience-negro.png" alt="Logo"></div>
+                    <div class="main-title-box" id="titleBox">
+                        <h1 class="fit-text" id="mainTitle">SOLUCIONES<br>GLOBALES<br>CERÁMICAS</h1>
+                        <div class="subtitle">V EXPOSICIÓN INTERNACIONAL</div>
+                    </div>
+                    <div class="data-block">
+                        <span style="font-size: 12px; font-weight: 700; margin-bottom: 10px; display:block;">Vila-real, Onda, Alcora</span>
+                        <div class="data-big">23–27 FEB <span class="year-pill">2026</span></div>
+                        <div class="data-row" style="margin-top: 10px; opacity: 0.8;"><span>Showrooms Grupo Pamesa</span></div>
+                    </div>
+                    <div class="footer-logos">
+                        <div class="logo-wrapper logo-pamesa"><img src="images/logos/pamesa.svg" alt="Pamesa"></div>
+                        <div class="logo-wrapper logo-geotiles"><img src="images/logos/geotiles.svg" alt="Geotiles"></div>
+                        <div class="logo-wrapper logo-prissmacer"><img src="images/logos/prissmacer.svg" alt="Prissmacer"></div>
+                        <div class="logo-wrapper logo-ecoceramic"><img src="images/logos/ecoceramic.png" alt="Ecoceramic"></div>
+                        <div class="logo-wrapper logo-navarti"><img src="images/logos/navarti.svg" alt="Navarti"></div>
+                        <div class="logo-wrapper logo-tau"><img src="images/logos/tau-ceramica.svg" alt="Tau"></div>
+                        <div class="logo-wrapper logo-ascale"><img src="images/logos/ASCALE LOGO 2024 blanco.png" alt="Ascale"></div>
+                        <div class="logo-wrapper logo-natucer"><img src="images/logos/Natucer.svg" alt="Natucer"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- CONTROLS: Botones modernos fuera del cartel -->
+        <div class="controls">
+            <div class="control-bar">
+                <button class="btn primary" onclick="System.generate()">
+                    <!-- Icono Rayo -->
+                    <svg viewBox="0 0 24 24"><path d="M11 21h-1l1-7H7.5c-.58 0-.57-.32-.38-.66.19-.34.05-.08.07-.12C8.48 10.94 10.42 7.54 13 3h1l-1 7h3.5c.49 0 .56.33.47.51l-.07.15C12.96 17.55 11 21 11 21z"></path></svg>
+                    Remix
+                </button>
+                <button class="btn" onclick="System.nextLayout()">
+                    <!-- Icono Layout -->
+                    <svg viewBox="0 0 24 24"><path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z"></path></svg>
+                    Layout
+                </button>
+                <button class="btn" onclick="System.nextColor()">
+                    <!-- Icono Color -->
+                    <svg viewBox="0 0 24 24"><path d="M12 3c-4.97 0-9 4.03-9 9s4.03 9 9 9c.83 0 1.5-.67 1.5-1.5 0-.39-.15-.74-.39-1.01-.23-.26-.38-.61-.38-.99 0-.83.67-1.5 1.5-1.5H16c2.76 0 5-2.24 5-5 0-4.42-4.03-8-9-8zm-5.5 9c-.83 0-1.5-.67-1.5-1.5S5.67 9 6.5 9 8 9.67 8 10.5 7.33 12 6.5 12zm3-4C8.67 8 8 7.33 8 6.5S8.67 5 9.5 5s1.5.67 1.5 1.5S10.33 8 9.5 8zm5 0c-.83 0-1.5-.67-1.5-1.5S13.67 5 14.5 5s1.5.67 1.5 1.5S15.33 8 14.5 8zm3 4c-.83 0-1.5-.67-1.5-1.5S16.67 9 17.5 9s1.5.67 1.5 1.5-.67 1.5-1.5 1.5z"></path></svg>
+                    Color
+                </button>
+                <button class="btn" onclick="System.download()">
+                    <!-- Icono Guardar -->
+                    <svg viewBox="0 0 24 24"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"></path></svg>
+                    Guardar
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const System = {
+            palettes: [
+                { bg: '#F4F4F4', fg: '#111111', accent: '#E83234', logo: 'negro' },
+                { bg: '#111111', fg: '#FFFFFF', accent: '#E83234', logo: 'blanco' },
+                { bg: '#1F3EAC', fg: '#FFFFFF', accent: '#61CE70', logo: 'blanco' }, 
+                { bg: '#ebc4c6', fg: '#013765', accent: '#E83234', logo: 'negro' },
+                { bg: '#000000', fg: '#FFFFFF', accent: '#1F3EAC', logo: 'blanco' },
+                { bg: '#013765', fg: '#ebc4c6', accent: '#FFFFFF', logo: 'blanco' },
+                { bg: '#E83234', fg: '#FFFFFF', accent: '#000000', logo: 'blanco' },
+                { bg: '#61CE70', fg: '#002855', accent: '#FFFFFF', logo: 'negro' },
+                { bg: '#013765', fg: '#FFFFFF', accent: '#61CE70', logo: 'blanco' },
+                { bg: '#46495A', fg: '#FFFFFF', accent: '#E83234', logo: 'blanco' },
+                { bg: '#46495A', fg: '#ebc4c6', accent: '#FFFFFF', logo: 'blanco' },
+                { bg: '#46495A', fg: '#FFFFFF', accent: '#61CE70', logo: 'blanco' },
+                { bg: '#F4F4F4', fg: '#46495A', accent: '#1F3EAC', logo: 'negro' },
+                { bg: '#ebc4c6', fg: '#46495A', accent: '#E83234', logo: 'negro' },
+                { bg: 'linear-gradient(135deg, #050505 0%, #013765 100%)', fg: '#FFFFFF', accent: '#E83234', logo: 'blanco' },
+                { bg: 'linear-gradient(to bottom, #46495A 0%, #1a1b22 100%)', fg: '#ebc4c6', accent: '#FFFFFF', logo: 'blanco' },
+                { bg: 'radial-gradient(circle at 50% 120%, #7a1012 0%, #111111 60%)', fg: '#FFFFFF', accent: '#FFFFFF', logo: 'blanco' },
+                { bg: 'linear-gradient(180deg, #1F3EAC 0%, #00152e 100%)', fg: '#FFFFFF', accent: '#61CE70', logo: 'blanco' },
+                { bg: 'linear-gradient(to bottom right, #ebc4c6 0%, #f9f9f9 70%)', fg: '#46495A', accent: '#E83234', logo: 'negro' },
+                { bg: 'linear-gradient(45deg, #002855 0%, #61CE70 100%)', fg: '#FFFFFF', accent: '#ebc4c6', logo: 'blanco' },
+                { bg: 'linear-gradient(160deg, #f0f0f0 0%, #cfcfcf 100%)', fg: '#111111', accent: '#46495A', logo: 'negro' },
+                { bg: 'linear-gradient(to right, #46495A, #013765)', fg: '#FFFFFF', accent: '#61CE70', logo: 'blanco' }
+            ],
+
+            layouts: ['l-swiss', 'l-mod', 'l-typo', 'l-asym', 'l-bottom', 'l-side-l', 'l-side-r', 'l-cross'],
+            state: { l: 0, p: 0 },
+
+            init: function() {
+                this.generateGrid();
+                this.generate();
+                this.fitPoster(); // Ajuste inicial
+                
+                // Event Listeners para responsividad
+                window.addEventListener('resize', () => {
+                    this.fitPoster();
+                    this.fitText();
+                });
+            },
+
+            // --- NUEVA FUNCIÓN DE AJUSTE RESPONSIVO ---
+            fitPoster: function() {
+                const stage = document.getElementById('stage');
+                const poster = document.getElementById('poster');
+                
+                // Dimensiones del stage (disponible)
+                const stageW = stage.clientWidth;
+                const stageH = stage.clientHeight;
+                
+                // Dimensiones reales del poster (800x1131)
+                const posterW = 800;
+                const posterH = 1131;
+                
+                // Margen de seguridad (padding visual)
+                const margin = 20; 
+
+                // Calcular escalas para ancho y alto
+                const scaleX = (stageW - margin) / posterW;
+                const scaleY = (stageH - margin) / posterH;
+
+                // Elegir la menor escala para que quepa entero (contain)
+                let scale = Math.min(scaleX, scaleY);
+                
+                // Límite para que no se pixele demasiado si la pantalla es gigante
+                if(scale > 2) scale = 2;
+
+                poster.style.transform = `scale(${scale})`;
+            },
+
+            generateGrid: function() {
+                const container = document.getElementById('gridLines');
+                container.innerHTML = '';
+                const styles = ['mondrian','radar','barcode','bauhaus','technical','diagonal_rain','golden','frame'];
+                const style = styles[Math.floor(Math.random() * styles.length)];
+                
+                // Lógica de grids (idéntica a tu código original)
+                if (style === 'mondrian') {
+                    const count = 2 + Math.floor(Math.random() * 3);
+                    for(let i=0; i<count; i++){
+                        const v = document.createElement('div'); v.className = 'grid-line line-v'; v.style.left = (Math.random() * 100) + '%'; container.appendChild(v);
+                        const h = document.createElement('div'); h.className = 'grid-line line-h'; h.style.top = (Math.random() * 100) + '%'; container.appendChild(h);
+                    }
+                } else if (style === 'radar') {
+                    const cx = 30 + Math.random() * 40; const cy = 30 + Math.random() * 40; 
+                    for(let i=1; i<=3; i++) {
+                        const circle = document.createElement('div'); const size = i * 25; 
+                        circle.style.cssText = `position:absolute;width:${size}%;padding-bottom:${size}%;border:1px solid var(--line);border-radius:50%;top:calc(${cy}% - ${size/2}%);left:calc(${cx}% - ${size/2}%);`;
+                        container.appendChild(circle);
+                    }
+                } else if (style === 'barcode') {
+                    const xStart = Math.random() * 50;
+                    for(let i=0; i<8; i++) {
+                        const bar = document.createElement('div'); bar.className = 'grid-line line-v'; bar.style.left = (xStart + (i * (2 + Math.random()*5))) + '%'; bar.style.opacity = Math.random(); container.appendChild(bar);
+                    }
+                } else if (style === 'bauhaus') {
+                    const arc = document.createElement('div'); arc.style.cssText = 'position:absolute;width:80%;height:80%;top:10%;left:10%;border:1px solid var(--line);';
+                    if(Math.random() > 0.5) { arc.style.borderRadius = '0 100% 0 0'; arc.style.borderLeft = 'none'; arc.style.borderBottom = 'none'; } else { arc.style.borderRadius = '0 0 0 100%'; arc.style.borderRight = 'none'; arc.style.borderTop = 'none'; }
+                    container.appendChild(arc);
+                } else if (style === 'technical') {
+                    for(let x=1; x<=3; x++) { for(let y=1; y<=3; y++) {
+                        const cross = document.createElement('div'); cross.style.cssText = `position:absolute;left:${x*25}%;top:${y*25}%;width:10px;height:10px;`;
+                        cross.innerHTML = '<div style="position:absolute;top:4px;left:0;width:100%;height:1px;background:var(--accent);"></div><div style="position:absolute;left:4px;top:0;height:100%;width:1px;background:var(--accent);"></div>';
+                        container.appendChild(cross);
+                    }}
+                } else if (style === 'diagonal_rain') {
+                    for(let i=0; i<3; i++) {
+                        const d = document.createElement('div'); d.style.cssText = `position:absolute;width:200%;height:1px;background:var(--line);top:${20+(i*20)}%;left:-50%;transform:rotate(-30deg);`;
+                        container.appendChild(d);
+                    }
+                } else if (style === 'golden') {
+                    const phi = 61.8; 
+                    const v = document.createElement('div'); v.className = 'grid-line line-v'; v.style.left = phi + '%'; container.appendChild(v);
+                    const h = document.createElement('div'); h.className = 'grid-line line-h'; h.style.top = (100 - phi) + '%'; container.appendChild(h);
+                    const box = document.createElement('div'); box.style.cssText = `position:absolute;left:${phi}%;top:${100-phi}%;width:${100-phi}%;height:${phi}%;background:var(--line);opacity:0.3;`; container.appendChild(box);
+                } else if (style === 'frame') {
+                    const frame = document.createElement('div'); frame.style.cssText = 'position:absolute;top:14%;bottom:18%;left:6%;right:6%;border:1px solid var(--line);z-index:0;';
+                    container.appendChild(frame);
+                    const corners = ['top:0;left:0', 'top:0;right:0', 'bottom:0;left:0', 'bottom:0;right:0'];
+                    const styles = ['border-top:2px solid var(--accent);border-left:2px solid var(--accent);', 'border-top:2px solid var(--accent);border-right:2px solid var(--accent);', 'border-bottom:2px solid var(--accent);border-left:2px solid var(--accent);', 'border-bottom:2px solid var(--accent);border-right:2px solid var(--accent);'];
+                    corners.forEach((p, i) => {
+                        const b = document.createElement('div'); b.style.cssText = `position:absolute;width:20px;height:20px;${p};${styles[i]}`; frame.appendChild(b);
+                    });
+                }
+            },
+
+            generate: function() {
+                this.state.l = Math.floor(Math.random() * this.layouts.length);
+                this.state.p = Math.floor(Math.random() * this.palettes.length);
+                this.render();
+            },
+            nextLayout: function() { this.state.l = (this.state.l + 1) % this.layouts.length; this.render(); },
+            nextColor: function() { this.state.p = (this.state.p + 1) % this.palettes.length; this.render(); },
+
+            render: function() {
+                const p = this.palettes[this.state.p];
+                const l = this.layouts[this.state.l];
+                const poster = document.getElementById('poster');
+                
+                poster.className = l;
+                poster.style.setProperty('--bg', p.bg);
+                poster.style.setProperty('--fg', p.fg);
+                poster.style.setProperty('--accent', p.accent);
+                
+                const isLightText = (p.fg === '#FFFFFF' || p.fg === '#ebc4c6');
+                poster.style.setProperty('--pill-text', isLightText ? '#111111' : '#FFFFFF');
+                poster.style.setProperty('--line', isLightText ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.1)');
+
+                const logoName = p.logo === 'blanco' ? 'logo-ceramica-experience-blanco.png' : 'logo-ceramica-experience-negro.png';
+                document.getElementById('logoImg').src = logoName;
+
+                const footerFilter = p.logo === 'blanco' ? 'grayscale(100%) brightness(0) invert(1)' : 'grayscale(100%) brightness(0)';
+                poster.style.setProperty('--logo-filter', footerFilter);
+
+                requestAnimationFrame(() => this.fitText());
+                if(Math.random() > 0.5) this.generateGrid();
+            },
+
+            fitText: function() {
+                const box = document.getElementById('titleBox');
+                const text = document.getElementById('mainTitle');
+                let fontSize = 160; 
+                text.style.fontSize = fontSize + 'px';
+                const availableWidth = box.clientWidth;
+                const availableHeight = box.clientHeight;
+
+                while ((text.scrollWidth > (availableWidth - 20) || text.scrollHeight > availableHeight) && fontSize > 40) {
+                    fontSize -= 2; 
+                    text.style.fontSize = fontSize + 'px';
+                }
+            },
+
+            download: function() {
+                const poster = document.getElementById('poster');
+                // Guardar el transform actual
+                const originalTransform = poster.style.transform;
+                
+                // Quitar transform para que html2canvas capture a tamaño real
+                poster.style.transform = 'none';
+                
+                html2canvas(poster, { scale: 2, useCORS: true }).then(canvas => {
+                    const a = document.createElement('a');
+                    a.download = 'CeramicaXP_2026_Smart.jpg';
+                    a.href = canvas.toDataURL('image/jpeg', 0.95);
+                    a.click();
+                    
+                    // Restaurar el escalado responsivo
+                    poster.style.transform = originalTransform;
+                });
+            }
+        };
+
+        window.onload = () => System.init();
+    </script>
+</body>
+</html>
