@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>CERAMICA XP 26 | Mobile Fix</title>
+    <title>CERAMICA XP 26 | Final Fix</title>
     
     <!-- LIBRERÍAS -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
@@ -15,151 +15,142 @@
 
     <style>
         :root {
-            /* Dimensiones Reales del Poster */
+            /* --- NO TOCAR: DIMENSIONES A4 REALES --- */
             --w: 800px;
             --h: 1131px;
             
-            /* Colores Base */
+            /* Colores */
             --bg: #F4F4F4; --fg: #111111; --accent: #E83234; 
             --line: rgba(0,0,0,0.1);
             --logo-filter: grayscale(100%) brightness(0); 
             --font-main: 'Inter', sans-serif;
             --font-tech: 'Space Grotesk', monospace;
 
-            /* UI Colors (Oscuro Glass) */
-            --ui-bar-bg: rgba(10, 10, 10, 0.95); /* Fondo casi opaco para móvil */
-            --ui-btn-bg: rgba(255, 255, 255, 0.08);
-            --ui-border: rgba(255, 255, 255, 0.15);
+            /* Interfaz Botones */
+            --ui-bg: #111111;
+            --ui-border: #333333;
         }
 
         * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 
         body {
-            background: #050505;
+            background: #000;
             margin: 0;
             padding: 0;
-            font-family: var(--font-main);
-            height: 100dvh; /* Dynamic Viewport Height para móviles */
+            height: 100dvh; /* Altura real del móvil */
             width: 100vw;
-            overflow: hidden; /* IMPORTANTE: Prohibido el scroll */
-            position: fixed; /* Fija el body para evitar rebotes en iOS */
+            overflow: hidden; /* IMPORTANTE: Sin scroll */
+            display: flex;
+            flex-direction: column; /* Estructura vertical: Stage arriba, Botones abajo */
         }
 
-        /* --- STAGE: Dónde vive el cartel --- */
-        .stage {
-            position: absolute;
-            top: 0;
-            left: 0;
+        /* --- 1. ZONA DEL CARTEL (STAGE) --- */
+        .stage-container {
+            flex: 1; /* Ocupa todo el espacio sobrante */
             width: 100%;
-            height: 100%; /* Ocupa todo, el JS ajustará el margen inferior */
+            position: relative;
             display: flex;
-            align-items: center; /* Centrado Vertical */
-            justify-content: center; /* Centrado Horizontal */
-            z-index: 1;
-            /* Patrón de fondo sutil para que no se vea vacío */
-            background-image: radial-gradient(#1a1a1a 1px, transparent 1px);
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            background-image: radial-gradient(#222 1px, transparent 1px);
             background-size: 20px 20px;
         }
 
-        /* --- POSTER --- */
+        /* --- 2. EL CARTEL (INTOCABLE) --- */
         #poster {
-            width: var(--w);
-            height: var(--h);
+            /* Dimensiones FIJAS. Si esto cambia, se rompe el A4. */
+            width: var(--w) !important;
+            height: var(--h) !important;
+            min-width: var(--w) !important;
+            min-height: var(--h) !important;
+            
             background: var(--bg); 
             color: var(--fg);
             position: relative;
             overflow: hidden;
-            box-shadow: 0 0 50px rgba(0,0,0,0.5);
-            /* La transformación Scale ocurre en JS */
+            box-shadow: 0 0 50px rgba(0,0,0,0.8);
+            
+            /* El escalado se hace SOLO vía JS con transform */
             transform-origin: center center;
             will-change: transform;
+            flex-shrink: 0; /* Prohibido aplastarse */
         }
 
-        /* --- CONTROLS: BARRA FIJA INFERIOR --- */
-        .controls-container {
-            position: fixed;
-            bottom: 0;
-            left: 0;
+        /* --- 3. ZONA DE BOTONES (FIJA ABAJO) --- */
+        .controls-area {
             width: 100%;
-            z-index: 9999; /* Siempre encima */
-            
-            /* Diseño de la barra */
-            background: var(--ui-bar-bg);
-            border-top: 1px solid #222;
+            background: var(--ui-bg);
+            border-top: 1px solid var(--ui-border);
             padding: 12px 15px;
             
-            /* Fix para iPhone X y superiores (Barra negra abajo) */
-            padding-bottom: calc(12px + env(safe-area-inset-bottom));
+            /* Respetar zona segura del iPhone (barra negra abajo) */
+            padding-bottom: calc(12px + env(safe-area-inset-bottom)); 
             
+            z-index: 1000;
             display: flex;
             justify-content: center;
-            box-shadow: 0 -10px 30px rgba(0,0,0,0.5);
+            flex-shrink: 0; /* No encoger */
         }
 
-        .control-group {
+        .controls-grid {
             display: flex;
             gap: 10px;
             width: 100%;
-            max-width: 500px; /* En escritorio no se estira infinito */
+            max-width: 500px;
         }
 
+        /* ESTILO DE LOS BOTONES */
         .btn {
-            flex: 1; /* Todos ocupan lo mismo */
-            background: var(--ui-btn-bg);
-            color: #ddd;
+            flex: 1;
+            background: rgba(255,255,255,0.05);
             border: 1px solid var(--ui-border);
-            height: 48px; /* Altura generosa para dedos */
-            border-radius: 12px;
-            font-size: 11px;
-            font-weight: 600;
+            color: #fff;
+            height: 50px; /* Botones grandes para el dedo */
+            border-radius: 8px;
+            font-family: var(--font-main);
+            font-size: 10px;
+            font-weight: 700;
             text-transform: uppercase;
-            letter-spacing: 0.05em;
+            letter-spacing: 0.5px;
             cursor: pointer;
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            transition: all 0.2s;
+            transition: background 0.2s;
         }
 
-        /* Iconos SVG */
-        .btn svg { width: 18px; height: 18px; fill: currentColor; margin-bottom: 3px; }
-
-        .btn:active { transform: scale(0.96); background: rgba(255,255,255,0.2); }
+        .btn:active { background: rgba(255,255,255,0.2); transform: scale(0.98); }
+        
+        .btn svg { width: 18px; height: 18px; fill: currentColor; margin-bottom: 4px; }
 
         .btn.primary {
             background: var(--accent);
-            color: #fff;
-            border-color: transparent;
-            box-shadow: 0 4px 12px rgba(232, 50, 52, 0.3);
-            flex: 1.2; /* Un poco más ancho */
+            border-color: var(--accent);
+            box-shadow: 0 4px 15px rgba(232, 50, 52, 0.4);
         }
-        
-        /* --- MEDIA QUERY ESCRITORIO --- */
-        @media (min-width: 768px) {
-            .controls-container {
-                bottom: 30px; /* Flotando */
+
+        /* MEDIA QUERY PARA ESCRITORIO (OPCIONAL, SOLO MEJORA VISUAL) */
+        @media (min-width: 800px) {
+            .controls-area {
+                position: absolute;
+                bottom: 30px;
                 left: 50%;
                 transform: translateX(-50%);
                 width: auto;
-                background: rgba(20, 20, 20, 0.8);
-                backdrop-filter: blur(12px);
-                border-radius: 20px;
-                border: 1px solid rgba(255,255,255,0.1);
-                padding: 10px;
-                padding-bottom: 10px; /* Reset del padding iPhone */
+                background: rgba(0,0,0,0.8);
+                backdrop-filter: blur(10px);
+                border-radius: 12px;
+                border: 1px solid #333;
+                padding-bottom: 12px; /* Reset padding iPhone */
             }
-            
-            .btn {
-                flex-direction: row; /* Icono al lado */
-                gap: 8px;
-                padding: 0 20px;
-                height: 44px;
-            }
+            .btn { flex-direction: row; gap: 8px; font-size: 12px; padding: 0 25px; }
             .btn svg { margin-bottom: 0; }
         }
 
-        /* --- CLASES DEL SISTEMA DE DISEÑO (Sin cambios funcionales) --- */
+        /* --- CLASES DEL DISEÑO INTERNO (Grid, Textos, etc) --- */
+        /* Estas clases no afectan al layout general, solo a lo de dentro del A4 */
         .grid-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: grid; grid-template-columns: repeat(12, 1fr); grid-template-rows: repeat(12, 1fr); z-index: 10; pointer-events: none; }
         .grid-line { position: absolute; background: var(--line); }
         .line-v { width: 1px; height: 100%; top: 0; }
@@ -182,7 +173,7 @@
         .logo-ascale img { height: auto !important; width: auto; max-width: 90px !important; max-height: 100%; }
         .noise { display: none; }
 
-        /* LAYOUTS */
+        /* LAYOUTS INTERNOS */
         .l-swiss .brand-logo { grid-column: 1; grid-row: 1; }
         .l-swiss .main-title-box { grid-column: 1 / span 12; grid-row: 3 / span 6; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); padding: 20px 0; }
         .l-swiss .data-block { grid-column: 1 / span 6; grid-row: 10 / span 2; } 
@@ -230,8 +221,9 @@
 </head>
 <body>
 
-    <!-- STAGE: El lienzo -->
-    <div class="stage" id="stage">
+    <!-- STAGE: ESPACIO PARA EL CARTEL -->
+    <div class="stage-container" id="stage">
+        <!-- El cartel TIENE QUE SER 800x1131 PIXELS SIEMPRE. Lo escalamos con JS -->
         <div id="poster" class="l-swiss">
             <div class="noise"></div>
             <div class="graphic-layer">
@@ -263,9 +255,9 @@
         </div>
     </div>
 
-    <!-- CONTROLS: Botones Fijos Abajo -->
-    <div class="controls-container" id="controls">
-        <div class="control-group">
+    <!-- CONTROLS: BARRA FIJA ABAJO -->
+    <div class="controls-area" id="controls">
+        <div class="controls-grid">
             <button class="btn primary" onclick="System.generate()">
                 <svg viewBox="0 0 24 24"><path d="M11 21h-1l1-7H7.5c-.58 0-.57-.32-.38-.66.19-.34.05-.08.07-.12C8.48 10.94 10.42 7.54 13 3h1l-1 7h3.5c.49 0 .56.33.47.51l-.07.15C12.96 17.55 11 21 11 21z"></path></svg>
                 Remix
@@ -287,7 +279,6 @@
 
     <script>
         const System = {
-            // Paletas
             palettes: [
                 { bg: '#F4F4F4', fg: '#111111', accent: '#E83234', logo: 'negro' },
                 { bg: '#111111', fg: '#FFFFFF', accent: '#E83234', logo: 'blanco' },
@@ -319,53 +310,45 @@
             init: function() {
                 this.generateGrid();
                 this.generate();
-                
-                // Escuchar resize y orientation change
-                window.addEventListener('resize', () => { this.fitPoster(); this.fitText(); });
-                
-                // Forzar un par de ajustes para móviles lentos en cargar
-                setTimeout(() => this.fitPoster(), 100);
-                setTimeout(() => this.fitPoster(), 500);
+                this.resizeLoop();
+                window.addEventListener('resize', () => this.fitPoster());
             },
 
-            // --- LÓGICA CRÍTICA DE RESPONSIVE ---
+            // --- CORAZÓN DEL SISTEMA RESPONSIVE ---
             fitPoster: function() {
                 const poster = document.getElementById('poster');
-                const controls = document.getElementById('controls');
+                const stage = document.getElementById('stage');
                 
-                // Dimensiones de la pantalla visible
-                const winW = window.innerWidth;
-                const winH = window.innerHeight;
+                // Medidas del contenedor libre (pantalla menos botones)
+                const stageW = stage.clientWidth;
+                const stageH = stage.clientHeight;
                 
-                // Altura de los botones (importante: restar esto para que el cartel no se tape)
-                const controlsH = controls.offsetHeight; 
-                
-                // Espacio disponible REAL para el cartel
-                // Dejamos 20px de margen arriba y 20px extra entre cartel y botones
-                const availableH = winH - controlsH - 40; 
-                const availableW = winW - 30; // 15px margen lados
-
-                // Dimensiones originales del diseño
+                // Medidas reales del cartel (A4)
                 const baseW = 800;
                 const baseH = 1131;
 
-                // Calcular escalas
+                // Dejamos 10px de margen por seguridad en los bordes
+                const availableW = stageW - 20;
+                const availableH = stageH - 20;
+
+                // Calculamos cuánto hay que reducirlo para que quepa ENTERO
                 const scaleX = availableW / baseW;
                 const scaleY = availableH / baseH;
-
-                // Usar la escala más pequeña para que quepa entero (contain)
+                
+                // Usamos la escala más pequeña para que no se recorte nada
                 let scale = Math.min(scaleX, scaleY);
                 
-                // Límite máximo para pantallas gigantes
+                // Límite de zoom máximo para pantallas gigantes
                 if(scale > 1.5) scale = 1.5;
 
-                // Aplicar transformación
                 poster.style.transform = `scale(${scale})`;
+            },
 
-                // Ajustar visualmente el contenedor del stage para que no sobre mucho espacio
-                // Esto centra visualmente el cartel en el hueco libre superior
-                const stage = document.getElementById('stage');
-                stage.style.height = (winH - controlsH) + 'px'; 
+            // Forzar recálculo constante por si carga lento el navegador móvil
+            resizeLoop: function() {
+                this.fitPoster();
+                this.fitText();
+                setTimeout(() => this.resizeLoop(), 500); 
             },
 
             generateGrid: function() {
@@ -374,6 +357,7 @@
                 const styles = ['mondrian','radar','barcode','bauhaus','technical','diagonal_rain','golden','frame'];
                 const style = styles[Math.floor(Math.random() * styles.length)];
                 
+                // Mismos grids que antes...
                 if (style === 'mondrian') {
                     const count = 2 + Math.floor(Math.random() * 3);
                     for(let i=0; i<count; i++){
@@ -451,10 +435,8 @@
                 const footerFilter = p.logo === 'blanco' ? 'grayscale(100%) brightness(0) invert(1)' : 'grayscale(100%) brightness(0)';
                 poster.style.setProperty('--logo-filter', footerFilter);
 
-                requestAnimationFrame(() => {
-                    this.fitText();
-                    this.fitPoster(); // Reajustar tamaño al renderizar
-                });
+                this.fitText();
+                this.fitPoster(); // Asegurar que encaja tras renderizar
                 
                 if(Math.random() > 0.5) this.generateGrid();
             },
@@ -466,6 +448,8 @@
                 text.style.fontSize = fontSize + 'px';
                 const availableWidth = box.clientWidth;
                 const availableHeight = box.clientHeight;
+                
+                // Evitamos bucle infinito con fontSize > 40
                 while ((text.scrollWidth > (availableWidth - 20) || text.scrollHeight > availableHeight) && fontSize > 40) {
                     fontSize -= 2; text.style.fontSize = fontSize + 'px';
                 }
@@ -474,14 +458,18 @@
             download: function() {
                 const poster = document.getElementById('poster');
                 const originalTransform = poster.style.transform;
-                // Resetear transform para captura limpia a resolución completa
+                
+                // 1. Quitar la transformación (zoom) para que salga a tamaño real
                 poster.style.transform = 'none';
                 
+                // 2. Renderizar
                 html2canvas(poster, { scale: 2, useCORS: true }).then(canvas => {
                     const a = document.createElement('a');
-                    a.download = 'CeramicaXP_2026.jpg';
+                    a.download = 'CeramicaXP_2026_Final.jpg';
                     a.href = canvas.toDataURL('image/jpeg', 0.95);
                     a.click();
+                    
+                    // 3. Devolver el zoom para que se siga viendo bien en el móvil
                     poster.style.transform = originalTransform;
                 });
             }
