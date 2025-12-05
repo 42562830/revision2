@@ -2,8 +2,8 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>CERAMICA XP 26 | Design System V6 (Responsive)</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>CERAMICA XP 26 | Mobile Fix</title>
     
     <!-- LIBRERÍAS -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
@@ -15,57 +15,53 @@
 
     <style>
         :root {
-            /* Dimensiones Reales del Poster (NO TOCAR) */
+            /* Dimensiones Reales del Poster */
             --w: 800px;
             --h: 1131px;
             
-            /* Variables iniciales */
-            --bg: #F4F4F4;
-            --fg: #111111;
-            --accent: #E83234; 
+            /* Colores Base */
+            --bg: #F4F4F4; --fg: #111111; --accent: #E83234; 
             --line: rgba(0,0,0,0.1);
             --logo-filter: grayscale(100%) brightness(0); 
             --font-main: 'Inter', sans-serif;
             --font-tech: 'Space Grotesk', monospace;
 
-            /* UI Colors */
-            --ui-bg: rgba(20, 20, 20, 0.85);
-            --ui-border: rgba(255, 255, 255, 0.1);
-            --ui-hover: rgba(255, 255, 255, 0.15);
+            /* UI Colors (Oscuro Glass) */
+            --ui-bar-bg: rgba(10, 10, 10, 0.95); /* Fondo casi opaco para móvil */
+            --ui-btn-bg: rgba(255, 255, 255, 0.08);
+            --ui-border: rgba(255, 255, 255, 0.15);
         }
 
-        * { box-sizing: border-box; }
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 
         body {
             background: #050505;
             margin: 0;
             padding: 0;
             font-family: var(--font-main);
-            height: 100vh;
+            height: 100dvh; /* Dynamic Viewport Height para móviles */
             width: 100vw;
-            overflow: hidden; /* CRUCIAL: Prevenir scroll global */
+            overflow: hidden; /* IMPORTANTE: Prohibido el scroll */
+            position: fixed; /* Fija el body para evitar rebotes en iOS */
         }
 
-        /* --- LAYOUT PRINCIPAL (RESPONSIVE) --- */
-        .app-layout {
-            display: flex;
-            flex-direction: column;
-            height: 100%;
-            width: 100%;
-        }
-
-        /* 1. EL ESCENARIO (Donde vive el poster) */
+        /* --- STAGE: Dónde vive el cartel --- */
         .stage {
-            flex: 1; /* Ocupa todo el espacio disponible */
-            position: relative;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            overflow: hidden;
+            position: absolute;
+            top: 0;
+            left: 0;
             width: 100%;
+            height: 100%; /* Ocupa todo, el JS ajustará el margen inferior */
+            display: flex;
+            align-items: center; /* Centrado Vertical */
+            justify-content: center; /* Centrado Horizontal */
+            z-index: 1;
+            /* Patrón de fondo sutil para que no se vea vacío */
+            background-image: radial-gradient(#1a1a1a 1px, transparent 1px);
+            background-size: 20px 20px;
         }
 
-        /* 2. EL POSTER (Dimensiones Fijas, se escala vía JS) */
+        /* --- POSTER --- */
         #poster {
             width: var(--w);
             height: var(--h);
@@ -74,122 +70,103 @@
             position: relative;
             overflow: hidden;
             box-shadow: 0 0 50px rgba(0,0,0,0.5);
-            transition: background 0.3s, color 0.3s;
-            /* El transform se aplica vía JS */
-            flex-shrink: 0; 
+            /* La transformación Scale ocurre en JS */
+            transform-origin: center center;
+            will-change: transform;
         }
 
-        /* --- UI CONTROLS (NUEVO DISEÑO) --- */
-        .controls {
-            z-index: 1000;
-            padding: 15px;
-            background: #000;
+        /* --- CONTROLS: BARRA FIJA INFERIOR --- */
+        .controls-container {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            z-index: 9999; /* Siempre encima */
+            
+            /* Diseño de la barra */
+            background: var(--ui-bar-bg);
+            border-top: 1px solid #222;
+            padding: 12px 15px;
+            
+            /* Fix para iPhone X y superiores (Barra negra abajo) */
+            padding-bottom: calc(12px + env(safe-area-inset-bottom));
+            
             display: flex;
             justify-content: center;
-            border-top: 1px solid #222;
+            box-shadow: 0 -10px 30px rgba(0,0,0,0.5);
         }
 
-        .control-bar {
+        .control-group {
             display: flex;
-            gap: 12px;
-            background: var(--ui-bg);
-            backdrop-filter: blur(10px);
-            -webkit-backdrop-filter: blur(10px);
-            padding: 8px;
-            border-radius: 16px;
-            border: 1px solid var(--ui-border);
-            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            gap: 10px;
             width: 100%;
-            max-width: 600px;
-            justify-content: space-between;
+            max-width: 500px; /* En escritorio no se estira infinito */
         }
 
         .btn {
-            flex: 1;
-            background: transparent;
-            color: #ccc;
-            border: 1px solid transparent;
-            padding: 12px 0;
-            border-radius: 10px;
-            font-family: var(--font-main);
+            flex: 1; /* Todos ocupan lo mismo */
+            background: var(--ui-btn-bg);
+            color: #ddd;
+            border: 1px solid var(--ui-border);
+            height: 48px; /* Altura generosa para dedos */
+            border-radius: 12px;
             font-size: 11px;
             font-weight: 600;
             text-transform: uppercase;
             letter-spacing: 0.05em;
             cursor: pointer;
-            transition: all 0.2s ease;
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            gap: 4px;
+            transition: all 0.2s;
         }
 
-        .btn svg { width: 20px; height: 20px; fill: currentColor; margin-bottom: 2px; }
-        
-        .btn:hover { background: var(--ui-hover); color: #fff; transform: translateY(-2px); }
-        .btn:active { transform: translateY(0); }
+        /* Iconos SVG */
+        .btn svg { width: 18px; height: 18px; fill: currentColor; margin-bottom: 3px; }
 
-        /* Botón Principal (Remix) */
+        .btn:active { transform: scale(0.96); background: rgba(255,255,255,0.2); }
+
         .btn.primary {
             background: var(--accent);
             color: #fff;
-            box-shadow: 0 4px 15px rgba(232, 50, 52, 0.4);
-            flex: 1.3; /* Un poco más grande */
+            border-color: transparent;
+            box-shadow: 0 4px 12px rgba(232, 50, 52, 0.3);
+            flex: 1.2; /* Un poco más ancho */
         }
-        .btn.primary:hover { background: #ff4d4f; }
-
-        /* Media Queries para Escritorio */
+        
+        /* --- MEDIA QUERY ESCRITORIO --- */
         @media (min-width: 768px) {
-            .app-layout {
-                flex-direction: row; /* Layout horizontal en PC */
-            }
-            
-            .stage {
-                width: auto;
-                background-image: radial-gradient(#1a1a1a 1px, transparent 1px);
-                background-size: 20px 20px;
-            }
-
-            .controls {
-                position: absolute;
-                bottom: 30px;
+            .controls-container {
+                bottom: 30px; /* Flotando */
                 left: 50%;
                 transform: translateX(-50%);
-                background: transparent;
-                border: none;
-                padding: 0;
                 width: auto;
-            }
-
-            .control-bar {
+                background: rgba(20, 20, 20, 0.8);
+                backdrop-filter: blur(12px);
+                border-radius: 20px;
+                border: 1px solid rgba(255,255,255,0.1);
                 padding: 10px;
-                gap: 15px;
+                padding-bottom: 10px; /* Reset del padding iPhone */
             }
-
+            
             .btn {
-                flex-direction: row;
-                padding: 12px 24px;
-                font-size: 12px;
+                flex-direction: row; /* Icono al lado */
                 gap: 8px;
+                padding: 0 20px;
+                height: 44px;
             }
-            .btn svg { margin: 0; }
+            .btn svg { margin-bottom: 0; }
         }
 
-        /* --- GRID SYSTEM & LAYERS (Originales conservados) --- */
+        /* --- CLASES DEL SISTEMA DE DISEÑO (Sin cambios funcionales) --- */
         .grid-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: grid; grid-template-columns: repeat(12, 1fr); grid-template-rows: repeat(12, 1fr); z-index: 10; pointer-events: none; }
         .grid-line { position: absolute; background: var(--line); }
         .line-v { width: 1px; height: 100%; top: 0; }
         .line-h { width: 100%; height: 1px; left: 0; }
         .graphic-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 5; overflow: hidden; }
         .super-year-bg { font-family: var(--font-main); font-weight: 800; position: absolute; line-height: 0.8; color: transparent; -webkit-text-stroke: 1.5px var(--line); white-space: nowrap; opacity: 0.6; transform-origin: center; }
-        
-        .content-layer {
-            position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 20;
-            display: grid; grid-template-columns: repeat(12, 1fr); grid-template-rows: repeat(12, 1fr);
-            padding: 40px; padding-bottom: 90px;
-        }
-
+        .content-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 20; display: grid; grid-template-columns: repeat(12, 1fr); grid-template-rows: repeat(12, 1fr); padding: 40px; padding-bottom: 90px; }
         .brand-logo { grid-column: 1 / span 12; height: 40px; display: flex; align-items: center; }
         .brand-logo img { height: 100%; width: auto; }
         .main-title-box { display: flex; flex-direction: column; justify-content: center; overflow: hidden; padding: 0; max-width: 100%; }
@@ -199,14 +176,13 @@
         .data-row { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 5px; font-size: 16px; font-weight: 500; text-transform: uppercase; }
         .data-big { font-size: 32px; font-weight: 700; letter-spacing: -0.02em; font-family: var(--font-main); display: block; }
         .year-pill { background: var(--fg); color: var(--pill-text); padding: 2px 8px; border-radius: 8px; font-size: 0.6em; vertical-align: middle; margin-left: 8px; font-weight: 700; }
-        
         .footer-logos { position: absolute; bottom: 40px; left: 40px; right: 40px; height: 20px; display: flex; flex-direction: row; justify-content: space-between; align-items: center; z-index: 30; gap: 15px; }
         .logo-wrapper { flex: 0 0 auto; display: flex; justify-content: center; align-items: center; height: 100%; }
         .footer-logos img { height: 100%; width: auto; max-width: 110px; object-fit: contain; filter: var(--logo-filter); opacity: 0.85; transition: filter 0.3s; }
         .logo-ascale img { height: auto !important; width: auto; max-width: 90px !important; max-height: 100%; }
         .noise { display: none; }
 
-        /* --- LAYOUTS CSS (Originales) --- */
+        /* LAYOUTS */
         .l-swiss .brand-logo { grid-column: 1; grid-row: 1; }
         .l-swiss .main-title-box { grid-column: 1 / span 12; grid-row: 3 / span 6; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); padding: 20px 0; }
         .l-swiss .data-block { grid-column: 1 / span 6; grid-row: 10 / span 2; } 
@@ -254,70 +230,64 @@
 </head>
 <body>
 
-    <div class="app-layout">
-        
-        <!-- STAGE: El área donde se ve el cartel -->
-        <div class="stage" id="stage">
-            <div id="poster" class="l-swiss">
-                <div class="noise"></div>
-                <div class="graphic-layer">
-                    <div class="super-year-bg">2026</div>
+    <!-- STAGE: El lienzo -->
+    <div class="stage" id="stage">
+        <div id="poster" class="l-swiss">
+            <div class="noise"></div>
+            <div class="graphic-layer">
+                <div class="super-year-bg">2026</div>
+            </div>
+            <div class="grid-layer" id="gridLines"></div>
+            <div class="content-layer">
+                <div class="brand-logo"><img id="logoImg" src="logo-ceramica-experience-negro.png" alt="Logo"></div>
+                <div class="main-title-box" id="titleBox">
+                    <h1 class="fit-text" id="mainTitle">SOLUCIONES<br>GLOBALES<br>CERÁMICAS</h1>
+                    <div class="subtitle">V EXPOSICIÓN INTERNACIONAL</div>
                 </div>
-                <div class="grid-layer" id="gridLines"></div>
-                <div class="content-layer">
-                    <div class="brand-logo"><img id="logoImg" src="logo-ceramica-experience-negro.png" alt="Logo"></div>
-                    <div class="main-title-box" id="titleBox">
-                        <h1 class="fit-text" id="mainTitle">SOLUCIONES<br>GLOBALES<br>CERÁMICAS</h1>
-                        <div class="subtitle">V EXPOSICIÓN INTERNACIONAL</div>
-                    </div>
-                    <div class="data-block">
-                        <span style="font-size: 12px; font-weight: 700; margin-bottom: 10px; display:block;">Vila-real, Onda, Alcora</span>
-                        <div class="data-big">23–27 FEB <span class="year-pill">2026</span></div>
-                        <div class="data-row" style="margin-top: 10px; opacity: 0.8;"><span>Showrooms Grupo Pamesa</span></div>
-                    </div>
-                    <div class="footer-logos">
-                        <div class="logo-wrapper logo-pamesa"><img src="images/logos/pamesa.svg" alt="Pamesa"></div>
-                        <div class="logo-wrapper logo-geotiles"><img src="images/logos/geotiles.svg" alt="Geotiles"></div>
-                        <div class="logo-wrapper logo-prissmacer"><img src="images/logos/prissmacer.svg" alt="Prissmacer"></div>
-                        <div class="logo-wrapper logo-ecoceramic"><img src="images/logos/ecoceramic.png" alt="Ecoceramic"></div>
-                        <div class="logo-wrapper logo-navarti"><img src="images/logos/navarti.svg" alt="Navarti"></div>
-                        <div class="logo-wrapper logo-tau"><img src="images/logos/tau-ceramica.svg" alt="Tau"></div>
-                        <div class="logo-wrapper logo-ascale"><img src="images/logos/ASCALE LOGO 2024 blanco.png" alt="Ascale"></div>
-                        <div class="logo-wrapper logo-natucer"><img src="images/logos/Natucer.svg" alt="Natucer"></div>
-                    </div>
+                <div class="data-block">
+                    <span style="font-size: 12px; font-weight: 700; margin-bottom: 10px; display:block;">Vila-real, Onda, Alcora</span>
+                    <div class="data-big">23–27 FEB <span class="year-pill">2026</span></div>
+                    <div class="data-row" style="margin-top: 10px; opacity: 0.8;"><span>Showrooms Grupo Pamesa</span></div>
+                </div>
+                <div class="footer-logos">
+                    <div class="logo-wrapper logo-pamesa"><img src="images/logos/pamesa.svg" alt="Pamesa"></div>
+                    <div class="logo-wrapper logo-geotiles"><img src="images/logos/geotiles.svg" alt="Geotiles"></div>
+                    <div class="logo-wrapper logo-prissmacer"><img src="images/logos/prissmacer.svg" alt="Prissmacer"></div>
+                    <div class="logo-wrapper logo-ecoceramic"><img src="images/logos/ecoceramic.png" alt="Ecoceramic"></div>
+                    <div class="logo-wrapper logo-navarti"><img src="images/logos/navarti.svg" alt="Navarti"></div>
+                    <div class="logo-wrapper logo-tau"><img src="images/logos/tau-ceramica.svg" alt="Tau"></div>
+                    <div class="logo-wrapper logo-ascale"><img src="images/logos/ASCALE LOGO 2024 blanco.png" alt="Ascale"></div>
+                    <div class="logo-wrapper logo-natucer"><img src="images/logos/Natucer.svg" alt="Natucer"></div>
                 </div>
             </div>
         </div>
+    </div>
 
-        <!-- CONTROLS: Botones modernos fuera del cartel -->
-        <div class="controls">
-            <div class="control-bar">
-                <button class="btn primary" onclick="System.generate()">
-                    <!-- Icono Rayo -->
-                    <svg viewBox="0 0 24 24"><path d="M11 21h-1l1-7H7.5c-.58 0-.57-.32-.38-.66.19-.34.05-.08.07-.12C8.48 10.94 10.42 7.54 13 3h1l-1 7h3.5c.49 0 .56.33.47.51l-.07.15C12.96 17.55 11 21 11 21z"></path></svg>
-                    Remix
-                </button>
-                <button class="btn" onclick="System.nextLayout()">
-                    <!-- Icono Layout -->
-                    <svg viewBox="0 0 24 24"><path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z"></path></svg>
-                    Layout
-                </button>
-                <button class="btn" onclick="System.nextColor()">
-                    <!-- Icono Color -->
-                    <svg viewBox="0 0 24 24"><path d="M12 3c-4.97 0-9 4.03-9 9s4.03 9 9 9c.83 0 1.5-.67 1.5-1.5 0-.39-.15-.74-.39-1.01-.23-.26-.38-.61-.38-.99 0-.83.67-1.5 1.5-1.5H16c2.76 0 5-2.24 5-5 0-4.42-4.03-8-9-8zm-5.5 9c-.83 0-1.5-.67-1.5-1.5S5.67 9 6.5 9 8 9.67 8 10.5 7.33 12 6.5 12zm3-4C8.67 8 8 7.33 8 6.5S8.67 5 9.5 5s1.5.67 1.5 1.5S10.33 8 9.5 8zm5 0c-.83 0-1.5-.67-1.5-1.5S13.67 5 14.5 5s1.5.67 1.5 1.5S15.33 8 14.5 8zm3 4c-.83 0-1.5-.67-1.5-1.5S16.67 9 17.5 9s1.5.67 1.5 1.5-.67 1.5-1.5 1.5z"></path></svg>
-                    Color
-                </button>
-                <button class="btn" onclick="System.download()">
-                    <!-- Icono Guardar -->
-                    <svg viewBox="0 0 24 24"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"></path></svg>
-                    Guardar
-                </button>
-            </div>
+    <!-- CONTROLS: Botones Fijos Abajo -->
+    <div class="controls-container" id="controls">
+        <div class="control-group">
+            <button class="btn primary" onclick="System.generate()">
+                <svg viewBox="0 0 24 24"><path d="M11 21h-1l1-7H7.5c-.58 0-.57-.32-.38-.66.19-.34.05-.08.07-.12C8.48 10.94 10.42 7.54 13 3h1l-1 7h3.5c.49 0 .56.33.47.51l-.07.15C12.96 17.55 11 21 11 21z"></path></svg>
+                Remix
+            </button>
+            <button class="btn" onclick="System.nextLayout()">
+                <svg viewBox="0 0 24 24"><path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z"></path></svg>
+                Layout
+            </button>
+            <button class="btn" onclick="System.nextColor()">
+                <svg viewBox="0 0 24 24"><path d="M12 3c-4.97 0-9 4.03-9 9s4.03 9 9 9c.83 0 1.5-.67 1.5-1.5 0-.39-.15-.74-.39-1.01-.23-.26-.38-.61-.38-.99 0-.83.67-1.5 1.5-1.5H16c2.76 0 5-2.24 5-5 0-4.42-4.03-8-9-8zm-5.5 9c-.83 0-1.5-.67-1.5-1.5S5.67 9 6.5 9 8 9.67 8 10.5 7.33 12 6.5 12zm3-4C8.67 8 8 7.33 8 6.5S8.67 5 9.5 5s1.5.67 1.5 1.5S10.33 8 9.5 8zm5 0c-.83 0-1.5-.67-1.5-1.5S13.67 5 14.5 5s1.5.67 1.5 1.5S15.33 8 14.5 8zm3 4c-.83 0-1.5-.67-1.5-1.5S16.67 9 17.5 9s1.5.67 1.5 1.5-.67 1.5-1.5 1.5z"></path></svg>
+                Color
+            </button>
+            <button class="btn" onclick="System.download()">
+                <svg viewBox="0 0 24 24"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"></path></svg>
+                Guardar
+            </button>
         </div>
     </div>
 
     <script>
         const System = {
+            // Paletas
             palettes: [
                 { bg: '#F4F4F4', fg: '#111111', accent: '#E83234', logo: 'negro' },
                 { bg: '#111111', fg: '#FFFFFF', accent: '#E83234', logo: 'blanco' },
@@ -342,49 +312,60 @@
                 { bg: 'linear-gradient(160deg, #f0f0f0 0%, #cfcfcf 100%)', fg: '#111111', accent: '#46495A', logo: 'negro' },
                 { bg: 'linear-gradient(to right, #46495A, #013765)', fg: '#FFFFFF', accent: '#61CE70', logo: 'blanco' }
             ],
-
+            
             layouts: ['l-swiss', 'l-mod', 'l-typo', 'l-asym', 'l-bottom', 'l-side-l', 'l-side-r', 'l-cross'],
             state: { l: 0, p: 0 },
 
             init: function() {
                 this.generateGrid();
                 this.generate();
-                this.fitPoster(); // Ajuste inicial
                 
-                // Event Listeners para responsividad
-                window.addEventListener('resize', () => {
-                    this.fitPoster();
-                    this.fitText();
-                });
+                // Escuchar resize y orientation change
+                window.addEventListener('resize', () => { this.fitPoster(); this.fitText(); });
+                
+                // Forzar un par de ajustes para móviles lentos en cargar
+                setTimeout(() => this.fitPoster(), 100);
+                setTimeout(() => this.fitPoster(), 500);
             },
 
-            // --- NUEVA FUNCIÓN DE AJUSTE RESPONSIVO ---
+            // --- LÓGICA CRÍTICA DE RESPONSIVE ---
             fitPoster: function() {
-                const stage = document.getElementById('stage');
                 const poster = document.getElementById('poster');
+                const controls = document.getElementById('controls');
                 
-                // Dimensiones del stage (disponible)
-                const stageW = stage.clientWidth;
-                const stageH = stage.clientHeight;
+                // Dimensiones de la pantalla visible
+                const winW = window.innerWidth;
+                const winH = window.innerHeight;
                 
-                // Dimensiones reales del poster (800x1131)
-                const posterW = 800;
-                const posterH = 1131;
+                // Altura de los botones (importante: restar esto para que el cartel no se tape)
+                const controlsH = controls.offsetHeight; 
                 
-                // Margen de seguridad (padding visual)
-                const margin = 20; 
+                // Espacio disponible REAL para el cartel
+                // Dejamos 20px de margen arriba y 20px extra entre cartel y botones
+                const availableH = winH - controlsH - 40; 
+                const availableW = winW - 30; // 15px margen lados
 
-                // Calcular escalas para ancho y alto
-                const scaleX = (stageW - margin) / posterW;
-                const scaleY = (stageH - margin) / posterH;
+                // Dimensiones originales del diseño
+                const baseW = 800;
+                const baseH = 1131;
 
-                // Elegir la menor escala para que quepa entero (contain)
+                // Calcular escalas
+                const scaleX = availableW / baseW;
+                const scaleY = availableH / baseH;
+
+                // Usar la escala más pequeña para que quepa entero (contain)
                 let scale = Math.min(scaleX, scaleY);
                 
-                // Límite para que no se pixele demasiado si la pantalla es gigante
-                if(scale > 2) scale = 2;
+                // Límite máximo para pantallas gigantes
+                if(scale > 1.5) scale = 1.5;
 
+                // Aplicar transformación
                 poster.style.transform = `scale(${scale})`;
+
+                // Ajustar visualmente el contenedor del stage para que no sobre mucho espacio
+                // Esto centra visualmente el cartel en el hueco libre superior
+                const stage = document.getElementById('stage');
+                stage.style.height = (winH - controlsH) + 'px'; 
             },
 
             generateGrid: function() {
@@ -393,7 +374,6 @@
                 const styles = ['mondrian','radar','barcode','bauhaus','technical','diagonal_rain','golden','frame'];
                 const style = styles[Math.floor(Math.random() * styles.length)];
                 
-                // Lógica de grids (idéntica a tu código original)
                 if (style === 'mondrian') {
                     const count = 2 + Math.floor(Math.random() * 3);
                     for(let i=0; i<count; i++){
@@ -471,7 +451,11 @@
                 const footerFilter = p.logo === 'blanco' ? 'grayscale(100%) brightness(0) invert(1)' : 'grayscale(100%) brightness(0)';
                 poster.style.setProperty('--logo-filter', footerFilter);
 
-                requestAnimationFrame(() => this.fitText());
+                requestAnimationFrame(() => {
+                    this.fitText();
+                    this.fitPoster(); // Reajustar tamaño al renderizar
+                });
+                
                 if(Math.random() > 0.5) this.generateGrid();
             },
 
@@ -482,28 +466,22 @@
                 text.style.fontSize = fontSize + 'px';
                 const availableWidth = box.clientWidth;
                 const availableHeight = box.clientHeight;
-
                 while ((text.scrollWidth > (availableWidth - 20) || text.scrollHeight > availableHeight) && fontSize > 40) {
-                    fontSize -= 2; 
-                    text.style.fontSize = fontSize + 'px';
+                    fontSize -= 2; text.style.fontSize = fontSize + 'px';
                 }
             },
 
             download: function() {
                 const poster = document.getElementById('poster');
-                // Guardar el transform actual
                 const originalTransform = poster.style.transform;
-                
-                // Quitar transform para que html2canvas capture a tamaño real
+                // Resetear transform para captura limpia a resolución completa
                 poster.style.transform = 'none';
                 
                 html2canvas(poster, { scale: 2, useCORS: true }).then(canvas => {
                     const a = document.createElement('a');
-                    a.download = 'CeramicaXP_2026_Smart.jpg';
+                    a.download = 'CeramicaXP_2026.jpg';
                     a.href = canvas.toDataURL('image/jpeg', 0.95);
                     a.click();
-                    
-                    // Restaurar el escalado responsivo
                     poster.style.transform = originalTransform;
                 });
             }
