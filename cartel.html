@@ -337,7 +337,7 @@
             palettes: [
                 { bg: '#F4F4F4', fg: '#111111', accent: '#E83234', logo: 'negro', name: 'Original' },
                 { bg: '#111111', fg: '#FFFFFF', accent: '#E83234', logo: 'blanco', name: 'Dark Mode' },
-                { bg: '#1F3EAC', fg: '#FFFFFF', accent: '#61CE70', logo: 'blanco', name: 'Electric Blue' }, 
+                { bg: '#1F3EAC', fg: '#FFFFFF', accent: '#61CE70', logo: 'blanco', name: 'Electric Blue' },
                 { bg: '#ebc4c6', fg: '#013765', accent: '#E83234', logo: 'negro', name: 'Soft Pink' },
                 { bg: '#000000', fg: '#FFFFFF', accent: '#1F3EAC', logo: 'blanco', name: 'Deep Space' },
                 { bg: '#013765', fg: '#ebc4c6', accent: '#FFFFFF', logo: 'blanco', name: 'Navy & Rose' },
@@ -357,7 +357,15 @@
                 { bg: 'linear-gradient(45deg, #002855 0%, #61CE70 100%)', fg: '#FFFFFF', accent: '#ebc4c6', logo: 'blanco', name: 'Aurora' },
                 { bg: 'linear-gradient(160deg, #f0f0f0 0%, #cfcfcf 100%)', fg: '#111111', accent: '#46495A', logo: 'negro', name: 'Silver' },
                 { bg: 'linear-gradient(to right, #46495A, #013765)', fg: '#FFFFFF', accent: '#61CE70', logo: 'blanco', name: 'Steel Blue' },
-                { bg: '#dcdde1', fg: '#111111', accent: '#546de5', logo: 'negro', name: 'Blueprint' }
+                { bg: '#dcdde1', fg: '#111111', accent: '#546de5', logo: 'negro', name: 'Blueprint' },
+                { bg: '#8A2BE2', fg: '#FFFFFF', accent: '#FFFFFF', logo: 'blanco', name: 'Bubble Pop', surface: '#FFFFFF', on_surface: '#8A2BE2', pill_bg: '#8A2BE2', pill_text: '#FFFFFF', logo_bg: '#FFFFFF' },
+                { bg: '#CCFF00', fg: '#000000', accent: '#000000', logo: 'negro', name: 'Lime Bubble', surface: '#000000', on_surface: '#CCFF00', pill_bg: '#000000', pill_text: '#CCFF00', logo_bg: '#FFFFFF' },
+                { bg: '#FF4500', fg: '#FFFFFF', accent: '#FFF5E1', logo: 'blanco', name: 'Tangerine', surface: '#FFF5E1', on_surface: '#FF4500', pill_bg: '#FF4500', pill_text: '#FFF5E1', logo_bg: '#FFFFFF' },
+                { bg: 'radial-gradient(circle at 50% 50%, #ccff00 0%, #000 80%)', fg: '#FFFFFF', accent: '#ccff00', logo: 'blanco', name: 'Acid Grunge', surface: '#111111', on_surface: '#ccff00', pill_bg: '#ccff00', pill_text: '#000000', logo_bg: '#000000' },
+                { bg: 'linear-gradient(180deg, #FF9A9E 0%, #FECFEF 100%)', fg: '#333333', accent: '#FF5E62', logo: 'negro', name: 'Soft Gradient', surface: '#FFFFFF', on_surface: '#333333', pill_bg: '#FF5E62', pill_text: '#FFFFFF', logo_bg: '#FFFFFF' },
+                { bg: '#e0ded6', fg: '#2b2a29', accent: '#d45d3f', logo: 'negro', name: 'Neo Earth', surface: '#F2F0E6', on_surface: '#2b2a29', pill_bg: '#d45d3f', pill_text: '#FFFFFF', logo_bg: '#FFFFFF' },
+                { bg: '#1a1a1a', fg: '#00ff41', accent: '#00ff41', logo: 'blanco', name: 'Matrix Punk', surface: '#000000', on_surface: '#00ff41', pill_bg: '#00ff41', pill_text: '#000000', logo_bg: '#000000' },
+                { bg: 'conic-gradient(from 180deg at 50% 50%, #2E3192 0deg, #1BFFFF 360deg)', fg: '#FFFFFF', accent: '#1BFFFF', logo: 'blanco', name: 'Deep Tech', surface: 'rgba(0,0,0,0.8)', on_surface: '#FFFFFF', pill_bg: '#1BFFFF', pill_text: '#000000', logo_bg: '#000000' }
             ],
             
             layouts: ['l-swiss', 'l-mod', 'l-typo', 'l-asym', 'l-bottom', 'l-side-l', 'l-side-r', 'l-cross', 'l-tech'],
@@ -643,17 +651,78 @@
             },
 
             download: function() {
-                const poster = document.getElementById('poster');
-                const originalTransform = poster.style.transform;
-                poster.style.transform = 'none';
-                html2canvas(poster, { scale: 2, useCORS: true }).then(canvas => {
-                    const a = document.createElement('a');
-                    a.download = 'CeramicaXP_2026.jpg';
-                    a.href = canvas.toDataURL('image/jpeg', 0.95);
-                    a.click();
-                    poster.style.transform = originalTransform;
-                });
+    // 1. Identificar el cartel original
+    const originalPoster = document.getElementById('poster');
+
+    // 2. Crear un contenedor temporal invisible (el "Estudio")
+    // Esto evita que el zoom de la pantalla afecte a la foto
+    const container = document.createElement('div');
+    container.style.position = 'fixed';
+    container.style.top = '-9999px';
+    container.style.left = '-9999px';
+    container.style.width = '800px';  // Ancho real del diseño
+    container.style.height = '1131px'; // Alto real del diseño
+    container.style.overflow = 'hidden';
+    document.body.appendChild(container);
+
+    // 3. Clonar el cartel
+    const clone = originalPoster.cloneNode(true);
+    
+    // 4. Limpiar el clon (Quitar transformaciones que rompen la foto)
+    clone.style.transform = 'none';
+    clone.style.margin = '0';
+    clone.style.borderRadius = '0';
+    clone.style.boxShadow = 'none';
+    // Aseguramos que las variables CSS se copien si están en el estilo inline
+    clone.style.cssText += originalPoster.style.cssText; 
+    // Forzamos reseteo de transformaciones de nuevo por si acaso
+    clone.style.transform = 'scale(1)'; 
+    clone.style.width = '800px';
+    clone.style.height = '1131px';
+
+    // Añadir el clon al contenedor invisible
+    container.appendChild(clone);
+
+    // 5. Configuración específica para los Logos en el momento de la foto
+    // Esto asegura que se vean bien aunque html2canvas sea caprichoso
+    const cloneLogos = clone.querySelectorAll('.logo-wrapper');
+    cloneLogos.forEach(wrapper => {
+        // Forzamos el filtro directamente en el momento de la captura
+        // para asegurar el color (blanco/negro)
+        const currentFilter = getComputedStyle(document.querySelector('.logo-wrapper')).filter;
+        wrapper.style.filter = currentFilter;
+    });
+
+    // 6. Generar la imagen desde el CLON, no desde la pantalla
+    setTimeout(() => {
+        html2canvas(clone, {
+            scale: 2, // Calidad alta (Retina)
+            useCORS: true,
+            backgroundColor: null, // Respetar transparencia o fondo
+            logging: false,
+            width: 800,
+            height: 1131,
+            windowWidth: 800,
+            windowHeight: 1131,
+            onclone: (clonedDoc) => {
+                // Truco extra: a veces las fuentes tardan en "asentarse" en el clon
+                // Forzamos un pequeño repintado si fuera necesario (aquí no suele hacer falta)
             }
+        }).then(canvas => {
+            // 7. Descargar
+            const link = document.createElement('a');
+            link.download = 'CeramicaXP_Cartel.jpg';
+            link.href = canvas.toDataURL('image/jpeg', 0.90);
+            link.click();
+
+            // 8. Limpieza: Borrar el contenedor temporal
+            document.body.removeChild(container);
+        }).catch(err => {
+            console.error("Error al generar imagen:", err);
+            document.body.removeChild(container);
+        });
+    }, 100); // Pequeña pausa para asegurar que el clon se renderizó en el DOM
+}
         };
 
         window.onload = () => System.init();
