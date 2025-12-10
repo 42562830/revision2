@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Generador Listado Imágenes - Pamesa</title>
+
+    <!-- Librerías para leer CSV y Excel -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
+
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f4f4f4;
+        }
+
+        .controls {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        button {
+            padding: 10px 20px;
+            background-color: #ce1719; /* Rojo Pamesa */
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        button:hover { background-color: #a31214; }
+        
+        button.btn-green { background-color: #28a745; }
+        button.btn-green:hover { background-color: #218838; }
+
+        /* Estilos exactos para replicar 'prueba2' */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background: white;
+            font-size: 13px;
+            font-family: Arial, sans-serif;
+            color: #000;
+        }
+
+        th {
+            background-color: #bfbfbf; /* Gris del pantallazo */
+            border: 1px solid #888;
+            padding: 8px;
+            text-align: left;
+            font-weight: bold;
+        }
+
+        td {
+            border: 1px solid #888; /* Bordes visibles */
+            padding: 6px 8px;
+            white-space: nowrap;
+        }
+
+        tr:nth-child(even) {
+            background-color: #f9f9f9;
+        }
+
+        #status {
+            font-weight: bold;
+            color: #666;
+            margin-left: 10px;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="controls">
+        <h2>Generador de Filenames y URLs</h2>
+        <div id="status">Cargando CSV...</div>
+        <div style="flex:1"></div>
+        <button onclick="downloadExcel()" class="btn-green">Descargar Excel</button>
+    </div>
+
+    <table id="result-table">
+        <thead>
+            <tr>
+                <!-- Orden exacto solicitado -->
+                <th>filename</th>
+                <th>effect</th>
+                <th>name</th>
+                <th>finish</th>
+                <th>size</th>
+                <th>color</th>
+                <th>url</th>
+            </tr>
+        </thead>
+        <tbody id="table-body">
+            <!-- JS rellenará esto -->
+        </tbody>
+    </table>
+
+    <script>
+        // ==========================================
+        // CONFIGURACIÓN DE COLUMNAS DEL CSV
+        // ==========================================
+        // Asegúrate de que estos nombres coinciden con la cabecera de tu CSV
+        const CSV_MAP = {
+            id: 'Id._Articulo',
+            efecto: 'Efecto_web',
+            nombre: 'Nombre',
+            acabado: 'Acabado_pieza_web',
+            medida: 'Medida', // Ej: "60x120"
+            color: 'Color_ok',
+            // IMPORTANTE: Cambia esto si tu columna de URL se llama diferente
+            url: 'Url_Imagen_Pieza' 
+        };
+
+        const CONFIG = {
+            csvFileName: './BD-21-11-2025.csv', 
+            encoding: 'ISO-8859-1'
+        };
+
+        let FINAL_DATA = [];
+
+        // 1. INICIAR AL CARGAR LA PÁGINA
+        document.addEventListener('DOMContentLoaded', () => {
+            loadCSV();
+        });
+
+        // 2. CARGAR CSV
+        function loadCSV() {
+            fetch(CONFIG.csvFileName)
+                .then(r => {
+                    if(!r.ok) throw new Error("No se encuentra el fichero CSV.");
+                    return r.arrayBuffer();
+                })
+                .then(buffer => {
+                    const decoder = new TextDecoder(CONFIG.encoding);
+                    const csvText = decoder.decode(buffer);
+                    
+                    Papa.parse(csvText, {
+                        header: true,
+                        delimiter: ";",
+                        skipEmptyLines: true,
+                        complete: function(results) {
+                            processData(results.data);
+                        }
+                    });
+                })
+                .catch(err => {
+                    document.getElementById('status').innerText = "Error: " + err.message;
+                    document.getElementById('status').style.color = "red";
+                });
+        }
+
+        // 3. LÓGICA DE PROCESADO (Cuadrado + Rectangular más grandes)
+        function processData(rawData) {
+            document.getElementById('status').innerText = "Procesando tamaños...";
+
+            // Diccionario para agrupar
+            // Clave: Efecto + Nombre + Color + Acabado
+            const groups = {};
+
+            rawData.forEach(row => {
+                // Limpieza básica
+                const efecto = (row[CSV_MAP.efecto] || '').trim();
+                const nombre = (row[CSV_MAP.nombre] || '').replace(/^(CR\.|ES\.)/i, '').trim(); // Limpiar CR./ES.
+                const color = (row[CSV_MAP.color] || '').trim();
+                const acabado = (row[CSV_MAP.acabado] || '').trim();
+                const medida = (row[CSV_MAP.medida] || '').toLowerCase().trim();
+                
+                if (!efecto || !nombre) return; // Saltar filas vacías
+
+                // Generar clave única de agrupación
+                const key = `${efecto}|${nombre}|${color}|${acabado}`;
+
+                if (!groups[key]) {
+                    groups[key] = {
+                        sq: null, // Mejor Cuadrado
+                        rect: null // Mejor Rectangular
+                    };
+                }
+
+                // Calcular Área y Forma
+                const shapeInfo = getShapeAndArea(medida);
+                const currentItem = {
+                    originalRow: row,
+                    area: shapeInfo.area,
+                    isSquare: shapeInfo.isSquare
+                };
+
+                // Lógica de "El más grande disponible"
+                if (currentItem.isSquare) {
+                    // Si no hay cuadrado guardado, o el actual es más grande, guardamos este
+                    if (!groups[key].sq || currentItem.area > groups[key].sq.area) {
+                        groups[key].sq = currentItem;
+                    }
+                } else {
+                    // Es rectangular
+                    if (!groups[key].rect || currentItem.area > groups[key].rect.area) {
+                        groups[key].rect = currentItem;
+                    }
+                }
+            });
+
+            // Aplanar resultados para la tabla
+            FINAL_DATA = [];
+            Object.keys(groups).sort().forEach(key => {
+                const g = groups[key];
+                // Primero añadimos el cuadrado si existe
+                if (g.sq) FINAL_DATA.push(formatOutputRow(g.sq.originalRow));
+                // Luego añadimos el rectangular si existe
+                if (g.rect) FINAL_DATA.push(formatOutputRow(g.rect.originalRow));
+            });
+
+            renderTable();
+            document.getElementById('status').innerText = `Listo: ${FINAL_DATA.length} imágenes filtradas.`;
+        }
+
+        // Función auxiliar para determinar si es cuadrado y su área
+        function getShapeAndArea(medidaStr) {
+            // Espera formatos tipo "60x120", "30,5x30,5", etc.
+            if (!medidaStr) return { area: 0, isSquare: false };
+
+            // Reemplazar coma por punto para parsear
+            const clean = medidaStr.replace(/,/g, '.');
+            const parts = clean.split('x');
+
+            if (parts.length < 2) return { area: 0, isSquare: false };
+
+            const w = parseFloat(parts[0]);
+            const h = parseFloat(parts[1]);
+
+            if (isNaN(w) || isNaN(h)) return { area: 0, isSquare: false };
+
+            // Consideramos cuadrado si la diferencia es mínima (para evitar errores de redondeo)
+            const isSquare = Math.abs(w - h) < 0.5;
+
+            return {
+                area: w * h,
+                isSquare: isSquare
+            };
+        }
+
+        // Formatear fila para la salida (filename, effect, name...)
+        function formatOutputRow(row) {
+            // Nombre limpio para la columna name
+            const cleanName = (row[CSV_MAP.nombre] || '').replace(/^(CR\.|ES\.)/i, '').trim();
+            const id = row[CSV_MAP.id] || '0000000000000';
+            
+            // Intento de obtener URL. Si la columna no existe en el CSV, saldrá vacía.
+            // Si necesitas construirla manualmente, puedes editar esta línea:
+            // const urlFinal = `https://www.pamesa.com/.../${id}.jpg`;
+            const urlFinal = row[CSV_MAP.url] || ''; 
+
+            return {
+                filename: `${id}.jpg`,
+                effect: row[CSV_MAP.efecto],
+                name: cleanName,
+                finish: row[CSV_MAP.acabado],
+                size: row[CSV_MAP.medida],
+                color: row[CSV_MAP.color],
+                url: urlFinal
+            };
+        }
+
+        // 4. RENDERIZAR HTML
+        function renderTable() {
+            const tbody = document.getElementById('table-body');
+            tbody.innerHTML = '';
+
+            const fragment = document.createDocumentFragment();
+
+            FINAL_DATA.forEach(item => {
+                const tr = document.createElement('tr');
+                
+                // El orden debe coincidir con los <th> del HTML
+                const fields = ['filename', 'effect', 'name', 'finish', 'size', 'color', 'url'];
+                
+                fields.forEach(field => {
+                    const td = document.createElement('td');
+                    if (field === 'filename') {
+                        // Negrita para el filename como en el ejemplo
+                        td.innerHTML = `<b>${item[field]}</b>`;
+                        td.style.backgroundColor = '#ddd'; // Un gris clarito para esta celda
+                    } else if (field === 'url') {
+                        td.innerHTML = `<a href="${item[field]}" target="_blank">${item[field]}</a>`;
+                    } else {
+                        td.innerText = item[field] || '';
+                    }
+                    tr.appendChild(td);
+                });
+                fragment.appendChild(tr);
+            });
+
+            tbody.appendChild(fragment);
+        }
+
+        // 5. EXPORTAR A EXCEL
+        function downloadExcel() {
+            if (FINAL_DATA.length === 0) {
+                alert("No hay datos para exportar");
+                return;
+            }
+            const ws = XLSX.utils.json_to_sheet(FINAL_DATA);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, "Imagenes_Efectos");
+            XLSX.writeFile(wb, "Pamesa_Indice_Imagenes.xlsx");
+        }
+
+    </script>
+</body>
+</html>
