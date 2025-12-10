@@ -36,16 +36,15 @@
             cursor: pointer;
             font-weight: bold;
             font-size: 13px;
+            transition: opacity 0.2s;
         }
+        button:hover { opacity: 0.9; }
         
-        .btn-red { background-color: #ce1719; } /* Botón Original */
-        .btn-red:hover { background-color: #a31214; }
-
-        .btn-blue { background-color: #0056b3; } /* NUEVO BOTÓN */
-        .btn-blue:hover { background-color: #004494; }
-
-        .btn-green { background-color: #28a745; }
-        .btn-green:hover { background-color: #218838; }
+        .btn-red { background-color: #ce1719; } /* Opción 1 */
+        .btn-blue { background-color: #0056b3; } /* Opción 2 */
+        .btn-orange { background-color: #fd7e14; } /* Opción 3 (NUEVA) */
+        
+        .btn-green { background-color: #28a745; margin-left: auto; } /* Descargar */
 
         /* Estilos Tabla */
         table {
@@ -55,6 +54,7 @@
             font-size: 13px;
             font-family: Arial, sans-serif;
             color: #000;
+            margin-top: 10px;
         }
 
         th {
@@ -63,6 +63,8 @@
             padding: 8px;
             text-align: left;
             font-weight: bold;
+            position: sticky;
+            top: 0;
         }
 
         td {
@@ -77,7 +79,8 @@
             font-weight: bold;
             color: #666;
             margin-left: 10px;
-            flex-grow: 1;
+            width: 100%;
+            margin-bottom: 10px;
         }
     </style>
 </head>
@@ -87,11 +90,13 @@
         <h2>Generador de Imágenes</h2>
         <div id="status">Esperando carga...</div>
         
-        <!-- Botón Original (Cuadrado + Rectangular) -->
+        <!-- BOTONES DE OPCIONES -->
         <button onclick="processSquareAndRect()" class="btn-red">Opción 1: Cuadrado + Rectangular (URL CSV)</button>
 
-        <!-- NUEVO BOTÓN (Solo el más grande) -->
         <button onclick="processMaxFormat()" class="btn-blue">Opción 2: Solo Formato Mayor (Sin 30x30)</button>
+
+        <!-- NUEVO BOTÓN OPCIÓN 3 -->
+        <button onclick="processOption3()" class="btn-orange">Opción 3: NO EXT/DUP + 1 Acabado Único</button>
 
         <button onclick="downloadExcel()" class="btn-green">Descargar Excel Actual</button>
     </div>
@@ -132,11 +137,10 @@
             encoding: 'ISO-8859-1'
         };
 
-        // Ruta fija solicitada para la Opción 2
         const FIXED_URL_BASE = "https://www.pamesa.com/ERP/4.0/empresas/151/045/imagenes/t00010602/";
 
-        let RAW_DATA = [];  // Datos crudos del CSV
-        let FINAL_DATA = []; // Datos procesados listos para tabla/excel
+        let RAW_DATA = [];
+        let FINAL_DATA = []; 
 
         // 1. CARGA INICIAL
         document.addEventListener('DOMContentLoaded', () => {
@@ -159,7 +163,7 @@
                         skipEmptyLines: true,
                         complete: function(results) {
                             RAW_DATA = results.data;
-                            document.getElementById('status').innerText = `CSV Cargado (${RAW_DATA.length} filas). Elige una opción.`;
+                            document.getElementById('status').innerText = `CSV Cargado (${RAW_DATA.length} filas). Selecciona una opción.`;
                         }
                     });
                 })
@@ -169,17 +173,81 @@
                 });
         }
 
+
         // ==========================================
-        // OPCIÓN 2: NUEVA FUNCIÓN (SOLICITADA)
+        // OPCIÓN 3: NUEVA (NO EXT/DUP + 1 Acabado)
         // ==========================================
-        function processMaxFormat() {
+        function processOption3() {
             if (RAW_DATA.length === 0) return alert("Espera a que cargue el CSV");
-            document.getElementById('status').innerText = "Procesando Formato Único (Max Área)...";
+            document.getElementById('status').innerText = "Procesando Opción 3 (Sin EXT/DUP, 1 Acabado)...";
 
             const groups = {};
 
             RAW_DATA.forEach(row => {
-                // 1. Limpieza de datos
+                // 1. Limpieza
+                let nombreRaw = (row[CSV_MAP.nombre] || '');
+                const nombreClean = nombreRaw.replace(/^(CR\.|ES\.)/i, '').trim();
+                const efecto = (row[CSV_MAP.efecto] || '').trim();
+                const color = (row[CSV_MAP.color] || '').trim();
+                const medida = (row[CSV_MAP.medida] || '').toLowerCase().trim();
+
+                if (!efecto || !nombreClean) return;
+
+                // 2. EXCLUSIONES DE NOMBRE (EXT / DUP)
+                const nombreUpper = nombreClean.toUpperCase();
+                if (nombreUpper.includes('EXT') || nombreUpper.includes('DUP')) return;
+
+                // 3. EXCLUSIÓN MEDIDA
+                if (medida === '30x30') return;
+
+                // 4. CLAVE DE AGRUPACIÓN (Optimizada)
+                // A diferencia de las otras opciones, aquí NO incluimos el acabado en la clave.
+                // Así, todos los acabados del mismo modelo+color compiten por un solo puesto.
+                const key = `${efecto}|${nombreClean}|${color}`;
+
+                // 5. Comparar Área
+                const shapeInfo = getShapeAndArea(medida);
+                
+                if (!groups[key]) {
+                    groups[key] = { row: row, area: shapeInfo.area };
+                } else {
+                    if (shapeInfo.area > groups[key].area) {
+                        groups[key] = { row: row, area: shapeInfo.area };
+                    }
+                }
+            });
+
+            // Generar Salida
+            FINAL_DATA = Object.keys(groups).sort().map(key => {
+                const row = groups[key].row;
+                const id = row[CSV_MAP.id] || '000000';
+                
+                return {
+                    filename: `${id}.jpg`,
+                    effect: row[CSV_MAP.efecto],
+                    name: (row[CSV_MAP.nombre] || '').replace(/^(CR\.|ES\.)/i, '').trim(),
+                    finish: row[CSV_MAP.acabado], // Mostramos el acabado ganador
+                    size: row[CSV_MAP.medida],
+                    color: row[CSV_MAP.color],
+                    url: `${FIXED_URL_BASE}${id}.jpg`
+                };
+            });
+
+            renderTable();
+            document.getElementById('status').innerText = `Opción 3 Lista (Optimizada): ${FINAL_DATA.length} imágenes únicas.`;
+        }
+
+
+        // ==========================================
+        // OPCIÓN 2: Solo Formato Mayor (Sin 30x30)
+        // ==========================================
+        function processMaxFormat() {
+            if (RAW_DATA.length === 0) return alert("Espera a que cargue el CSV");
+            document.getElementById('status').innerText = "Procesando Opción 2...";
+
+            const groups = {};
+
+            RAW_DATA.forEach(row => {
                 const nombre = (row[CSV_MAP.nombre] || '').replace(/^(CR\.|ES\.)/i, '').trim();
                 const efecto = (row[CSV_MAP.efecto] || '').trim();
                 const color = (row[CSV_MAP.color] || '').trim();
@@ -187,36 +255,20 @@
                 const medida = (row[CSV_MAP.medida] || '').toLowerCase().trim();
 
                 if (!efecto || !nombre) return;
-
-                // 2. EXCLUSIÓN: Si es "30x30", saltamos esta fila
                 if (medida === '30x30') return;
 
-                // 3. Clave única de agrupación
+                // Clave incluye acabado (aquí sí distinguimos acabados)
                 const key = `${efecto}|${nombre}|${color}|${acabado}`;
-
-                // 4. Calcular Área
                 const shapeInfo = getShapeAndArea(medida);
 
-                // 5. Comparar: ¿Es esta fila "más grande" que la que ya teníamos?
-                if (!groups[key]) {
-                    // Es el primero que encontramos
+                if (!groups[key] || shapeInfo.area > groups[key].area) {
                     groups[key] = { row: row, area: shapeInfo.area };
-                } else {
-                    // Ya tenemos uno, comparamos áreas
-                    if (shapeInfo.area > groups[key].area) {
-                        groups[key] = { row: row, area: shapeInfo.area }; // Actualizamos con el ganador
-                    }
                 }
             });
 
-            // Convertir a lista final
             FINAL_DATA = Object.keys(groups).sort().map(key => {
                 const row = groups[key].row;
                 const id = row[CSV_MAP.id] || '000000';
-                
-                // Construcción URL Específica solicitada
-                const generatedUrl = `${FIXED_URL_BASE}${id}.jpg`;
-
                 return {
                     filename: `${id}.jpg`,
                     effect: row[CSV_MAP.efecto],
@@ -224,21 +276,20 @@
                     finish: row[CSV_MAP.acabado],
                     size: row[CSV_MAP.medida],
                     color: row[CSV_MAP.color],
-                    url: generatedUrl
+                    url: `${FIXED_URL_BASE}${id}.jpg`
                 };
             });
 
             renderTable();
-            document.getElementById('status').innerText = `Opción 2 Lista: ${FINAL_DATA.length} modelos únicos.`;
+            document.getElementById('status').innerText = `Opción 2 Lista: ${FINAL_DATA.length} filas.`;
         }
 
-
         // ==========================================
-        // OPCIÓN 1: ORIGINAL (Cuadrado + Rect)
+        // OPCIÓN 1: Cuadrado + Rect (URL CSV)
         // ==========================================
         function processSquareAndRect() {
             if (RAW_DATA.length === 0) return alert("Espera a que cargue el CSV");
-            document.getElementById('status').innerText = "Procesando Cuadrado + Rectangular...";
+            document.getElementById('status').innerText = "Procesando Opción 1...";
 
             const groups = {};
 
@@ -275,7 +326,6 @@
             document.getElementById('status').innerText = `Opción 1 Lista: ${FINAL_DATA.length} filas.`;
         }
 
-        // Helper para la opción 1 (usa URL del CSV)
         function formatOutputRowOriginal(row) {
             const id = row[CSV_MAP.id] || '000000';
             return {
@@ -285,12 +335,12 @@
                 finish: row[CSV_MAP.acabado],
                 size: row[CSV_MAP.medida],
                 color: row[CSV_MAP.color],
-                url: row[CSV_MAP.url_csv] || '' // Usa columna del CSV
+                url: row[CSV_MAP.url_csv] || ''
             };
         }
 
         // ==========================================
-        // UTILIDADES COMUNES
+        // UTILIDADES
         // ==========================================
         function getShapeAndArea(medidaStr) {
             if (!medidaStr) return { area: 0, isSquare: false };
@@ -321,7 +371,6 @@
                         td.innerHTML = `<b>${item[field]}</b>`;
                         td.style.backgroundColor = '#ddd';
                     } else if (field === 'url') {
-                        // Truncar visualmente la URL si es muy larga, pero el link funciona
                         td.innerHTML = `<a href="${item[field]}" target="_blank" style="color:blue; text-decoration:underline;">${item[field]}</a>`;
                     } else {
                         td.innerText = item[field] || '';
@@ -337,7 +386,7 @@
             if (FINAL_DATA.length === 0) return alert("Primero genera un listado con los botones de arriba.");
             const ws = XLSX.utils.json_to_sheet(FINAL_DATA);
             const wb = XLSX.utils.book_new();
-            XLSX.utils.book_append_sheet(wb, ws, "Imagenes");
+            XLSX.utils.book_append_sheet(wb, ws, "Listado_Filtrado");
             XLSX.writeFile(wb, "Pamesa_Listado_Imagenes.xlsx");
         }
     </script>
