@@ -1,0 +1,1484 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Generador de Índices - Pamesa</title>
+
+    <!-- FUENTES CORPORATIVAS -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&family=Roboto+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+
+    <!-- LIBRERÍAS EXTERNAS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
+
+    <style>
+        /* ========================================= */
+        /* SISTEMA DE DISEÑO PAMESA (Consistente)    */
+        /* ========================================= */
+        :root {
+            --color-principal: #ce1719;
+            --color-principal-hover: #b51517;
+            --color-fondo: #f8fafc;
+            --color-blanco: #ffffff;
+            --color-texto-principal: #0f172a;
+            --color-texto-secundario: #64748b;
+            --color-borde-suave: #e2e8f0;
+            --font-main: 'Montserrat', sans-serif;
+            --font-tech: 'Roboto Mono', monospace;
+        }
+
+        body {
+            font-family: var(--font-main);
+            background-color: var(--color-fondo);
+            color: var(--color-texto-principal);
+            height: 100vh;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* HEADER */
+        header {
+            background: white;
+            border-bottom: 1px solid var(--color-borde-suave);
+            padding: 0 24px;
+            height: 64px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-shrink: 0;
+            z-index: 20;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+        }
+
+        .header-brand {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-weight: 700;
+            color: #333;
+            font-size: 1.1rem;
+        }
+
+        /* LAYOUT PRINCIPAL */
+        #workspace {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+        }
+
+        /* SIDEBAR DE FILTROS */
+        #filters-panel {
+            width: 360px;
+            background: white;
+            border-right: 1px solid var(--color-borde-suave);
+            display: flex;
+            flex-direction: column;
+            overflow-y: auto;
+            flex-shrink: 0;
+            z-index: 10;
+        }
+
+        .filter-section {
+            padding: 20px;
+            border-bottom: 1px solid var(--color-borde-suave);
+        }
+
+        .filter-section h3 {
+            font-size: 0.75rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            color: var(--color-texto-secundario);
+            margin-bottom: 12px;
+            letter-spacing: 0.05em;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .input-group {
+            margin-bottom: 12px;
+        }
+
+        .input-group label {
+            display: block;
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: #475569;
+            margin-bottom: 4px;
+        }
+
+        .form-control {
+            width: 100%;
+            padding: 8px 12px;
+            border-radius: 6px;
+            border: 1px solid var(--color-borde-suave);
+            font-size: 0.85rem;
+            background-color: #f8fafc;
+            transition: all 0.2s;
+            color: #1e293b;
+        }
+
+        .form-control:focus {
+            background-color: white;
+            border-color: var(--color-principal);
+            outline: none;
+            box-shadow: 0 0 0 3px rgba(206, 23, 25, 0.1);
+        }
+
+        /* AREA DE RESULTADOS */
+        #results-area {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            background: var(--color-fondo);
+            overflow: hidden;
+            position: relative;
+        }
+
+        /* BARRA DE HERRAMIENTAS SUPERIOR */
+        #toolbar {
+            padding: 12px 24px;
+            background: white;
+            border-bottom: 1px solid var(--color-borde-suave);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .column-toggles {
+            display: flex;
+            gap: 12px;
+            overflow-x: auto;
+            padding-bottom: 4px;
+            max-width: 60%;
+        }
+
+        .col-toggle {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 0.75rem;
+            cursor: pointer;
+            white-space: nowrap;
+            user-select: none;
+        }
+
+        .col-toggle input {
+            accent-color: var(--color-principal);
+        }
+
+        /* TABLA DE RESULTADOS */
+        #table-container {
+            flex: 1;
+            overflow: auto;
+            padding: 24px;
+        }
+
+        .excel-table {
+            width: 100%;
+            border-collapse: collapse;
+            background: white;
+            font-size: 0.8rem;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+
+        .excel-table th {
+            background: #f1f5f9;
+            border: 1px solid #cbd5e1;
+            padding: 8px 12px;
+            text-align: left;
+            font-weight: 700;
+            color: #334155;
+            position: sticky;
+            top: 0;
+            z-index: 5;
+        }
+
+        .excel-table td {
+            border: 1px solid #e2e8f0;
+            padding: 6px 12px;
+            color: #334155;
+            white-space: nowrap;
+        }
+
+        .excel-table tr:nth-child(even) {
+            background-color: #f8fafc;
+        }
+
+        .excel-table tr:hover {
+            background-color: #fef2f2;
+        }
+
+        /* BOTONES */
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 16px;
+            border-radius: 6px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            border: 1px solid transparent;
+        }
+
+        .btn-primary {
+            background-color: var(--color-principal);
+            color: white;
+            box-shadow: 0 2px 4px rgba(206, 23, 25, 0.2);
+        }
+
+        .btn-primary:hover {
+            background-color: var(--color-principal-hover);
+            transform: translateY(-1px);
+        }
+
+        .btn-secondary {
+            background-color: white;
+            border-color: var(--color-borde-suave);
+            color: #475569;
+        }
+
+        .btn-secondary:hover {
+            border-color: #94a3b8;
+            background-color: #f8fafc;
+        }
+
+        .btn-green {
+            background-color: #10b981;
+            color: white;
+        }
+        .btn-green:hover { background-color: #059669; }
+
+        /* BOTONES DE FECHA RÁPIDA */
+        .btn-pill-group {
+            display: flex;
+            gap: 4px;
+            margin-top: 8px;
+        }
+        .btn-pill {
+            flex: 1;
+            padding: 6px 4px;
+            font-size: 0.65rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            text-align: center;
+            border: 1px solid var(--color-borde-suave);
+            background: white;
+            color: #64748b;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .btn-pill:hover {
+            background: #f1f5f9;
+            color: var(--color-texto-principal);
+        }
+        .btn-pill.active {
+            background: #fef2f2;
+            color: var(--color-principal);
+            border-color: #fecaca;
+        }
+
+        /* BOTONES DE PRESET */
+        .preset-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 6px;
+            margin-top: 8px;
+        }
+        .btn-preset {
+            padding: 8px;
+            font-size: 0.7rem;
+            text-align: left;
+            border: 1px solid #e2e8f0;
+            background: #fff;
+            color: #475569;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .btn-preset:hover {
+            background: #f1f5f9;
+            border-color: #cbd5e1;
+            color: #1e293b;
+        }
+        .btn-preset.active-preset {
+            background: #ce1719;
+            color: white;
+            border-color: #ce1719;
+            box-shadow: 0 2px 4px rgba(206, 23, 25, 0.2);
+        }
+        .category-label {
+            font-size: 0.65rem;
+            font-weight: 700;
+            color: #94a3b8;
+            margin-top: 12px;
+            margin-bottom: 4px;
+            text-transform: uppercase;
+        }
+
+        /* LOADING OVERLAY */
+        #loading-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(255,255,255,0.9);
+            z-index: 100;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+
+        /* SCROLLBAR */
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+        
+        /* Stats pill */
+        .count-pill {
+            background: #e2e8f0;
+            padding: 4px 10px;
+            border-radius: 99px;
+            font-size: 0.75rem;
+            font-weight: 700;
+            color: #475569;
+        }
+
+        /* Active preset banner */
+        #active-preset-banner {
+            background: #fff1f2;
+            color: #991b1b;
+            padding: 8px 24px;
+            font-size: 0.8rem;
+            border-bottom: 1px solid #fecaca;
+            display: none;
+            justify-content: space-between;
+            align-items: center;
+        }
+    </style>
+</head>
+
+<body>
+
+    <!-- OVERLAY DE CARGA -->
+    <div id="loading-overlay">
+        <div class="animate-spin rounded-full h-10 w-10 border-b-2 border-red-600 mb-4"></div>
+        <h2 class="text-xl font-bold text-gray-800">Cargando Catálogo...</h2>
+        <p class="text-gray-500 text-sm mt-2">Leyendo BD-21-11-2025.csv</p>
+    </div>
+
+    <!-- HEADER -->
+    <header>
+        <div class="header-brand">
+            <i data-lucide="database" class="text-red-600 w-6 h-6"></i>
+            <span>PAMESA | Generador de Índices</span>
+        </div>
+        <div class="flex items-center gap-4">
+            <span id="total-count" class="count-pill">0 filas</span>
+            <button id="btn-reset" class="btn btn-secondary text-xs">
+                <i data-lucide="rotate-ccw" class="w-3 h-3"></i> Limpiar Filtros
+            </button>
+        </div>
+    </header>
+
+    <!-- BANNER DE PRESET ACTIVO -->
+    <div id="active-preset-banner">
+        <div><span class="font-bold">MODO PRESET ACTIVO:</span> <span id="preset-name">Nombre</span></div>
+        <button onclick="resetFilters()" class="underline text-xs hover:text-red-800">Salir del modo preset</button>
+    </div>
+
+    <!-- WORKSPACE -->
+    <div id="workspace">
+        
+        <!-- PANEL IZQUIERDO: FILTROS -->
+        <aside id="filters-panel">
+            
+            <!-- SECCIÓN: ÍNDICES PREDETERMINADOS -->
+            <div class="filter-section bg-slate-50">
+                <h3><i data-lucide="book-template" class="w-3 h-3"></i> Índices Catálogo</h3>
+
+                <button id="btn-download-all" class="btn btn-green w-full mb-4 justify-center text-xs">
+                    <i data-lucide="file-spreadsheet" class="w-4 h-4"></i> Descargar Excel Completo
+                </button>
+                
+                <div class="category-label">General</div>
+                <div class="preset-grid">
+                    <button class="btn-preset" data-preset="colecciones">Colecciones</button>
+                    <button class="btn-preset" data-preset="alfabetico">Alfabético</button>
+                    <button class="btn-preset" data-preset="formatos">Formatos</button>
+                    <button class="btn-preset" data-preset="efectos">Efectos</button>
+                </div>
+
+                <div class="category-label">Técnicos (CTE/R)</div>
+                <div class="preset-grid">
+                    <button class="btn-preset" data-preset="cte1">CTE 1</button>
+                    <button class="btn-preset" data-preset="cte2">CTE 2</button>
+                    <button class="btn-preset" data-preset="cte3">CTE 3</button>
+                    <button class="btn-preset" data-preset="r9">R9</button>
+                    <button class="btn-preset" data-preset="r10">R10</button>
+                    <button class="btn-preset" data-preset="r11">R11</button>
+                </div>
+
+                <div class="category-label">Técnicos (DIN/PTV)</div>
+                <div class="preset-grid">
+                    <button class="btn-preset" data-preset="dinb">DIN B</button>
+                    <button class="btn-preset" data-preset="dinc">DIN C</button>
+                    <button class="btn-preset" data-preset="ptv">PTV (>36)</button>
+                </div>
+
+                <div class="category-label">Específicos</div>
+                <div class="preset-grid">
+                    <button class="btn-preset" data-preset="20mm">20MM</button>
+                    <button class="btn-preset" data-preset="ext">EXT</button>
+                    <button class="btn-preset" data-preset="dup">DUP</button>
+                    <button class="btn-preset" data-preset="antic">ANTIC</button>
+                </div>
+
+                <div class="category-label text-red-600 font-bold">NOVEDADES</div>
+                <div class="preset-grid">
+    <!-- Este es el botón nuevo -->
+                   <button class="btn-preset col-span-2 justify-center font-bold text-red-700 bg-red-50 border-red-100" data-preset="novedades25">
+                   <i data-lucide="sparkles" class="w-3 h-3 text-red-600"></i> Altas 2025 (Detallado)
+                   </button>
+                </div>
+            </div>
+
+
+            <!-- Filtro: TEXTO LIBRE -->
+            <div class="filter-section">
+                <h3><i data-lucide="search" class="w-3 h-3"></i> Búsqueda Rápida</h3>
+                <div class="input-group">
+                    <input type="text" id="f-search" class="form-control" placeholder="Buscar por Nombre, ID, Serie...">
+                </div>
+            </div>
+
+            <!-- Filtro: FECHA / NOVEDADES -->
+            <div class="filter-section">
+                <h3><i data-lucide="calendar" class="w-3 h-3"></i> Fechas y Novedades</h3>
+                <div class="grid grid-cols-2 gap-2">
+                    <div class="input-group">
+                        <label>Año</label>
+                        <select id="f-year" class="form-control date-manual">
+                            <option value="">Todos</option>
+                            <!-- JS Rellena años -->
+                        </select>
+                    </div>
+                    <div class="input-group">
+                        <label>Mes</label>
+                        <select id="f-month" class="form-control date-manual">
+                            <option value="">Todos</option>
+                            <option value="0">Enero</option>
+                            <option value="1">Febrero</option>
+                            <option value="2">Marzo</option>
+                            <option value="3">Abril</option>
+                            <option value="4">Mayo</option>
+                            <option value="5">Junio</option>
+                            <option value="6">Julio</option>
+                            <option value="7">Agosto</option>
+                            <option value="8">Septiembre</option>
+                            <option value="9">Octubre</option>
+                            <option value="10">Noviembre</option>
+                            <option value="11">Diciembre</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="btn-pill-group">
+                    <button class="btn-pill" id="btn-date-1m" title="Últimos 30 días">1 Mes</button>
+                    <button class="btn-pill" id="btn-date-3m" title="Últimos 90 días">3 Meses</button>
+                    <button class="btn-pill" id="btn-date-year" title="Todo este año">Este Año</button>
+                </div>
+            </div>
+
+            <!-- Filtro: ESTRUCTURAL -->
+            <div class="filter-section">
+                <h3><i data-lucide="layout-grid" class="w-3 h-3"></i> Estructura</h3>
+                <div class="input-group">
+                    <label>Colección</label>
+                    <select id="f-coleccion" class="form-control"><option value="">Todas</option></select>
+                </div>
+                <div class="input-group">
+                    <label>Serie</label>
+                    <select id="f-serie" class="form-control"><option value="">Todas</option></select>
+                </div>
+                <div class="input-group">
+                    <label>Tipología</label>
+                    <select id="f-tipologia" class="form-control"><option value="">Todas</option></select>
+                </div>
+            </div>
+
+            <!-- Filtro: PRODUCTO -->
+            <div class="filter-section">
+                <h3><i data-lucide="layers" class="w-3 h-3"></i> Producto</h3>
+                <div class="grid grid-cols-2 gap-2">
+                    <div class="input-group">
+                        <label>Medida</label>
+                        <select id="f-medida" class="form-control"><option value="">Todas</option></select>
+                    </div>
+                    <div class="input-group">
+                        <label>Espesor</label>
+                        <select id="f-espesor" class="form-control"><option value="">Todos</option></select>
+                    </div>
+                </div>
+                <div class="input-group">
+                    <label>Acabado (Pieza)</label>
+                    <select id="f-acabado" class="form-control"><option value="">Todos</option></select>
+                </div>
+                <div class="input-group">
+                    <label>Efecto</label>
+                    <select id="f-efecto" class="form-control"><option value="">Todos</option></select>
+                </div>
+                 <div class="input-group">
+                    <label>Color</label>
+                    <select id="f-color" class="form-control"><option value="">Todos</option></select>
+                </div>
+            </div>
+
+            <!-- Filtro: TÉCNICO -->
+            <div class="filter-section">
+                <h3><i data-lucide="flask-conical" class="w-3 h-3"></i> Técnico</h3>
+                <div class="grid grid-cols-2 gap-2">
+                    <div class="input-group">
+                        <label>CTE (Clase)</label>
+                        <select id="f-clase" class="form-control"><option value="">Todas</option></select>
+                    </div>
+                    <div class="input-group">
+                        <label>R (DIN 51130)</label>
+                        <select id="f-r" class="form-control"><option value="">Todas</option></select>
+                    </div>
+                    <div class="input-group">
+                        <label>DIN (51097)</label>
+                        <select id="f-letra" class="form-control"><option value="">Todas</option></select>
+                    </div>
+                    <div class="input-group">
+                        <label>PTV</label>
+                        <select id="f-ptv" class="form-control"><option value="">Todos</option></select>
+                    </div>
+                </div>
+                <div class="input-group">
+                    <label>Grupo Precio</label>
+                    <select id="f-precio" class="form-control"><option value="">Todos</option></select>
+                </div>
+            </div>
+        </aside>
+
+        <!-- PANEL DERECHO: RESULTADOS -->
+        <main id="results-area">
+            
+            <!-- TOOLBAR -->
+            <div id="toolbar">
+                <div class="flex flex-col gap-2 w-full">
+                    <div class="flex justify-between items-center w-full">
+                        <div class="text-sm font-bold text-gray-500 uppercase tracking-wider">
+                            <span id="col-selector-title">Columnas Visibles</span>
+                        </div>
+                        <div class="flex gap-2">
+                            <button id="btn-copy" class="btn btn-green">
+                                <i data-lucide="copy" class="w-4 h-4"></i> Copiar para Excel
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="column-toggles custom-scrollbar" id="column-selector">
+                        <!-- JS genera checkboxes aquí -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- TABLA -->
+            <div id="table-container">
+                <table id="result-table" class="excel-table">
+                    <thead>
+                        <tr id="table-header">
+                            <!-- JS genera headers -->
+                        </tr>
+                    </thead>
+                    <tbody id="table-body">
+                        <!-- JS genera filas -->
+                    </tbody>
+                </table>
+            </div>
+
+        </main>
+    </div>
+
+    <!-- JAVASCRIPT LOGIC -->
+    <script>
+        // 1. CONFIGURACIÓN Y MAPEO DE DATOS
+        const CONFIG = {
+            csvFileName: './BD-21-11-2025.csv', 
+            encoding: 'ISO-8859-1'
+        };
+
+        // Mapeo exacto de columnas
+        const FIELD_MAP = {
+            id: { key: 'Id._Articulo', label: 'ID', default: true },
+            coleccion: { key: 'Coleccion_web', label: 'Colección', default: true },
+            serie: { key: 'Serie_web', label: 'Serie', default: true },
+            nombre: { key: 'Nombre', label: 'Nombre Modelo', default: true },
+            medida: { key: 'Medida', label: 'Medida', default: true },
+            color: { key: 'Color_ok', label: 'Color', default: true },
+            acabado: { key: 'Acabado_pieza_web', label: 'Acabado', default: true },
+            espesor: { key: 'Espesor_mm', label: 'Espesor', default: true },
+            tipologia: { key: 'Desc._Familia_web', label: 'Tipología', default: false },
+            familia: { key: 'Familia', label: 'Familia', default: false },
+            efecto: { key: 'Efecto_web', label: 'Efecto', default: false },
+            uso: { key: 'Tipo_de_uso', label: 'Uso', default: false },
+            variacion: { key: 'Variacion_cromatica', label: 'V-Shade', default: false },
+            grupo: { key: 'Grupo_Tarifa', label: 'Grupo Precio', default: true },
+            graficas: { key: 'Graficas', label: 'Gráficas', default: false },
+            pei: { key: 'UNE-EN_ISO_10545-7', label: 'PEI', default: false },
+            clase: { key: 'UNE_41901:2017_EX', label: 'CTE', default: false },
+            r: { key: 'Deslizamiento_DIN_51130', label: 'R', default: false },
+            din: { key: 'DIN_51097', label: 'DIN', default: false },
+            ptv: { key: 'PTV_(WET)', label: 'PTV', default: false },
+            area: { key: 'area', label: 'Area', default: false },
+            
+            // Packing
+            pz_caja: { key: 'Pz/Caja', label: 'Pz/Cj', default: true },
+            m2_caja: { key: 'M2/Caja', label: 'M2/Cj', default: true },
+            kg_caja: { key: 'Kg/Caja', label: 'Kg/Cj', default: false },
+            cj_pal: { key: 'Cj/Pallet', label: 'Cj/Pal', default: true },
+            m2_pal: { key: 'M2/Pallet', label: 'M2/Pal', default: true },
+            kg_pal: { key: 'Kg/Pallet', label: 'Kg/Pal', default: false },
+            
+            fecha: { key: 'Fecha_de_alta', label: 'F. Alta', default: true },
+            pagina: { key: 'Num_Pagina', label: 'Página', default: true } // AÑADIDA COLUMNA PAGINA
+        };
+
+        const STATE = {
+            data: [],
+            filtered: [],
+            visibleColumns: [], 
+            dateFilter: { minDate: null, mode: 'manual' },
+            activePreset: null
+        };
+
+        // --- FUNCIONES AUXILIARES PARA LIMPIEZA ---
+        function getCleanName(row) {
+            let name = row[FIELD_MAP.nombre.key] || '';
+            // Eliminar CR. o ES. al inicio (case insensitive), y espacios
+            return name.replace(/^(CR\.|ES\.)/i, '').trim();
+        }
+
+
+        function getDedupeKey(row) {
+            const nombre = getCleanName(row).toUpperCase();
+            const coleccion = (row[FIELD_MAP.coleccion.key] || '').toUpperCase();
+            const serie = (row[FIELD_MAP.serie.key] || '').toUpperCase();
+            return `${nombre}_${coleccion}_${serie}`;
+        }
+        // --- 2. CONFIGURACIÓN DE PRESETS (ACTUALIZADO CON COLUMNA PAGINA) ---
+        const PRESETS = {
+            // INDICE COLECCIONES: Deduplicar por Colección+Serie
+            'colecciones': {
+                name: 'Listado de Colecciones',
+                process: (data) => data,
+                deduplicate: (row) => `${row[FIELD_MAP.coleccion.key]}_${row[FIELD_MAP.serie.key]}`, // Clave compuesta
+                sort: (a, b) => {
+                    const c = (a[FIELD_MAP.coleccion.key]||'').localeCompare(b[FIELD_MAP.coleccion.key]||'');
+                    return c !== 0 ? c : (a[FIELD_MAP.serie.key]||'').localeCompare(b[FIELD_MAP.serie.key]||'');
+                },
+                columns: [
+                    { type: 'field', id: 'coleccion' },
+                    { type: 'field', id: 'serie' },
+                    { type: 'field', id: 'pagina' }, // USAR CAMPO PAGINA REAL
+                    { type: 'virtual', header: 'Novedad 2025', value: (row) => row._year === 2025 ? '✅ 2025' : '' }
+                ]
+            },
+
+            // INDICE ALFABETICO: Nombre limpio, Deduplicado por Nombre
+            'alfabetico': {
+                name: 'Índice Alfabético',
+                process: (data) => data,
+                deduplicate: (row) => getDedupeKey(row), 
+                sort: (a, b) => getCleanName(a).localeCompare(getCleanName(b)),
+                columns: [
+                    { type: 'virtual', header: 'Nombre Modelo', value: (row) => getCleanName(row) },
+                    { type: 'field', id: 'coleccion' },
+                    { type: 'field', id: 'pagina' } // USAR CAMPO PAGINA REAL
+                ]
+            },
+
+            // INDICE FORMATOS (CORREGIDO)
+            'formatos': {
+                name: 'Por Formatos (Área)',
+                process: (data) => data,
+                
+                // CAMBIO CLAVE: La "identidad" de la fila ahora es NOMBRE + MEDIDA.
+                // Así, si el modelo existe en 5 medidas, aparecerá 5 veces (una en cada grupo de medida).
+                deduplicate: (row) => `${getDedupeKey(row)}_${row[FIELD_MAP.medida.key]}`,
+                
+                sort: (a, b) => {
+                    // 1. Ordenar por Área (de mayor a menor formato)
+                    const areaA = parseFloat((a[FIELD_MAP.area.key] || '0').replace(',', '.'));
+                    const areaB = parseFloat((b[FIELD_MAP.area.key] || '0').replace(',', '.'));
+                    
+                    // Si el área es distinta, poner el más grande primero
+                    if (areaB !== areaA) return areaB - areaA;
+                    
+                    // 2. Si es el mismo formato, ordenar alfabéticamente por nombre
+                    return getCleanName(a).localeCompare(getCleanName(b));
+                },
+                columns: [
+                    { type: 'field', id: 'medida' }, 
+                    { type: 'virtual', header: 'Nombre Modelo', value: (row) => getCleanName(row) }, 
+                    { type: 'field', id: 'pagina' }
+                ]
+            },
+
+            // NUEVO PRESET: NOVEDADES 2025 (TOTALMENTE DESGLOSADO)
+            'novedades25': {
+                name: 'Altas Novedades 2025 (Detallado)',
+                
+                // 1. FILTRO: Solo año 2025
+                process: (data) => data.filter(row => row._year === 2025),
+                
+                // 2. DEDUPLICACIÓN: CLAVE MAESTRA
+                // Nombre + Medida + Espesor + Color + Acabado
+                deduplicate: (row) => {
+                    const nombre = getCleanName(row).toUpperCase();
+                    const medida = row[FIELD_MAP.medida.key] || '';
+                    const espesor = row[FIELD_MAP.espesor.key] || ''; // <--- NUEVO
+                    const color = row[FIELD_MAP.color.key] || '';
+                    const acabado = row[FIELD_MAP.acabado.key] || '';
+                    
+                    const coleccion = (row[FIELD_MAP.coleccion.key] || '').toUpperCase();
+                    const serie = (row[FIELD_MAP.serie.key] || '').toUpperCase();
+                    return `${nombre}_${coleccion}_${serie}_${medida}_${espesor}_${color}_${acabado}`;
+                },
+                
+                // 3. ORDEN JERÁRQUICO
+                sort: (a, b) => {
+                    // 1. Colección
+                    const colA = (a[FIELD_MAP.coleccion.key] || '').localeCompare(b[FIELD_MAP.coleccion.key] || '');
+                    if (colA !== 0) return colA;
+                    
+                    // 2. Serie
+                    const serA = (a[FIELD_MAP.serie.key] || '').localeCompare(b[FIELD_MAP.serie.key] || '');
+                    if (serA !== 0) return serA;
+
+                    // 3. Nombre Modelo
+                    const nomA = getCleanName(a).localeCompare(getCleanName(b));
+                    if (nomA !== 0) return nomA;
+
+                    // 4. Medida
+                    const medA = (a[FIELD_MAP.medida.key] || '').localeCompare(b[FIELD_MAP.medida.key] || '');
+                    if (medA !== 0) return medA;
+
+                    // 5. Espesor (Agrupamos espesores juntos)
+                    const espA = (a[FIELD_MAP.espesor.key] || '').localeCompare(b[FIELD_MAP.espesor.key] || '');
+                    if (espA !== 0) return espA;
+
+                    // 6. Color
+                    const colorA = (a[FIELD_MAP.color.key] || '').localeCompare(b[FIELD_MAP.color.key] || '');
+                    if (colorA !== 0) return colorA;
+
+                    // 7. Acabado
+                    return (a[FIELD_MAP.acabado.key] || '').localeCompare(b[FIELD_MAP.acabado.key] || '');
+                },
+
+                // 4. COLUMNAS VISIBLES (Añadido Espesor)
+                columns: [
+                    { type: 'field', id: 'coleccion' },
+                    { type: 'field', id: 'serie' },
+                    { type: 'virtual', header: 'Modelo', value: (row) => getCleanName(row) },
+                    { type: 'field', id: 'medida' },
+                    { type: 'field', id: 'espesor' }, // <--- AÑADIDO VISUALMENTE
+                    { type: 'field', id: 'color' },
+                    { type: 'field', id: 'acabado' },
+                    { type: 'field', id: 'fecha' },
+                    { type: 'field', id: 'pagina' }
+                ]
+            },
+
+            // INDICE EFECTOS: Efecto primero, deduplicado por nombre limpio
+            'efectos': {
+                name: 'Por Efectos',
+                process: (data) => data,
+                deduplicate: (row) => getDedupeKey(row),
+                sort: (a, b) => {
+                    // 1. Efecto Asc
+                    const efA = (a[FIELD_MAP.efecto.key]||'');
+                    const efB = (b[FIELD_MAP.efecto.key]||'');
+                    if (efA !== efB) return efA.localeCompare(efB);
+                    // 2. Nombre Limpio Asc
+                    return getCleanName(a).localeCompare(getCleanName(b));
+                },
+                columns: [
+                    { type: 'field', id: 'efecto' }, 
+                    { type: 'virtual', header: 'Nombre Modelo', value: (row) => getCleanName(row) }, 
+                    { type: 'field', id: 'pagina' } // USAR CAMPO PAGINA REAL
+                ]
+            },
+
+            // TÉCNICOS: Nombre limpio en todos y pagina real
+            'cte1': createTechPreset('clase', '1', 'CTE Clase 1'),
+            'cte2': createTechPreset('clase', '2', 'CTE Clase 2'),
+            'cte3': createTechPreset('clase', '3', 'CTE Clase 3'),
+            'r9': createTechPreset('r', '9', 'R9'),
+            'r10': createTechPreset('r', '10', 'R10'),
+            'r11': createTechPreset('r', '11', 'R11'),
+            'dinb': createTechPreset('din', 'B', 'DIN B'),
+            'dinc': createTechPreset('din', 'C', 'DIN C'),
+
+            'ptv': {
+                name: 'PTV > 36',
+                process: (data) => data.filter(row => {
+                    const valStr = row[FIELD_MAP.ptv.key];
+                    if (!valStr) return false;
+                    const match = valStr.match(/\d+/);
+                    if (match) return parseInt(match[0]) >= 36;
+                    return false;
+                }),
+                deduplicate: (row) => getDedupeKey(row),
+                sort: (a, b) => getCleanName(a).localeCompare(getCleanName(b)),
+                columns: [
+                    { type: 'virtual', header: 'Nombre Modelo', value: (row) => getCleanName(row) },
+                    { type: 'field', id: 'acabado' },
+                    { type: 'field', id: 'serie' },
+                    { type: 'field', id: 'coleccion' },
+                    { type: 'field', id: 'pagina' } // USAR CAMPO PAGINA REAL
+                ]
+            },
+
+            '20mm': {
+                name: 'Modelos 20MM',
+                process: (data) => data.filter(r => (r[FIELD_MAP.espesor.key]||'').includes('20')),
+                deduplicate: (row) => getDedupeKey(row),
+                sort: (a, b) => getCleanName(a).localeCompare(getCleanName(b)),
+                columns: [
+                    { type: 'virtual', header: 'Nombre Modelo', value: (row) => getCleanName(row) },
+                    { type: 'field', id: 'serie' },
+                    { type: 'field', id: 'coleccion' },
+                    { type: 'field', id: 'pagina' } // USAR CAMPO PAGINA REAL
+                ]
+            },
+
+            'ext': createNameFilterPreset('EXT', 'Modelos EXT'),
+            'dup': createNameFilterPreset('DUP', 'Modelos DUP'),
+            'antic': {
+                name: 'Índice ANTIC (Series Familia 33|105)',
+                process: (data) => data.filter(r => {
+                    const famRaw = (r[FIELD_MAP.familia.key] || '').toString().trim();
+                    // Acepta '33', '105' y también formatos tipo '33,105' o '33|105' por seguridad
+                    const famTokens = famRaw.split(/[\s,|;/]+/).filter(Boolean);
+                    return famTokens.includes('33') || famTokens.includes('105');
+                }),
+                // Sin duplicados por SERIE (y su Colección)
+                deduplicate: (row) => `${row[FIELD_MAP.coleccion.key]}_${row[FIELD_MAP.serie.key]}`,
+                sort: (a, b) => {
+                    const c = (a[FIELD_MAP.coleccion.key]||'').localeCompare(b[FIELD_MAP.coleccion.key]||'');
+                    return c !== 0 ? c : (a[FIELD_MAP.serie.key]||'').localeCompare(b[FIELD_MAP.serie.key]||'');
+                },
+                columns: [
+                    { type: 'field', id: 'coleccion' },
+                    { type: 'field', id: 'serie' },
+                    { type: 'field', id: 'pagina' } // Página de la primera aparición de la serie
+                ]
+            }
+        };
+
+        // Helpers actualizados con pagina real
+        function createTechPreset(fieldId, valueMatch, label) {
+            return {
+                name: label,
+                process: (data) => data.filter(r => {
+                    const val = (r[FIELD_MAP[fieldId].key] || '').toUpperCase();
+                    return val.includes(valueMatch.toUpperCase());
+                }),
+                deduplicate: (row) => getDedupeKey(row),
+                sort: (a, b) => getCleanName(a).localeCompare(getCleanName(b)),
+                columns: [
+                    { type: 'virtual', header: 'Nombre Modelo', value: (row) => getCleanName(row) }, // Clean
+                    { type: 'field', id: 'acabado' },
+                    { type: 'field', id: 'serie' },
+                    { type: 'field', id: 'coleccion' },
+                    { type: 'field', id: 'pagina' } // USAR CAMPO PAGINA REAL
+                ]
+            };
+        }
+
+        function createNameFilterPreset(textMatch, label) {
+            return {
+                name: label,
+                process: (data) => data.filter(r => (r[FIELD_MAP.nombre.key] || '').toUpperCase().includes(textMatch.toUpperCase())),
+                deduplicate: (row) => getDedupeKey(row),
+                sort: (a, b) => getCleanName(a).localeCompare(getCleanName(b)),
+                columns: [
+                    { type: 'virtual', header: 'Nombre Modelo', value: (row) => getCleanName(row) }, // Clean
+                    { type: 'field', id: 'serie' },
+                    { type: 'field', id: 'coleccion' },
+                    { type: 'field', id: 'pagina' } // USAR CAMPO PAGINA REAL
+                ]
+            };
+        }
+
+        // --- 3. INICIALIZACIÓN ---
+        document.addEventListener('DOMContentLoaded', () => {
+            initColumnSelector();
+            loadCSV();
+            lucide.createIcons();
+            
+            const inputs = document.querySelectorAll('.form-control');
+            inputs.forEach(input => {
+                input.addEventListener('input', debounce(() => {
+                    if(input.classList.contains('date-manual')) resetSmartDateButtons();
+                    applyFilters();
+                }, 300));
+                
+                input.addEventListener('change', () => {
+                     if(input.classList.contains('date-manual')) resetSmartDateButtons();
+                    applyFilters();
+                });
+            });
+
+            document.getElementById('btn-date-1m').addEventListener('click', () => setSmartDateFilter(1, 'btn-date-1m'));
+            document.getElementById('btn-date-3m').addEventListener('click', () => setSmartDateFilter(3, 'btn-date-3m'));
+            document.getElementById('btn-date-year').addEventListener('click', () => setSmartDateFilter(12, 'btn-date-year', true));
+
+            document.querySelectorAll('.btn-preset').forEach(btn => {
+                btn.addEventListener('click', () => activatePreset(btn.dataset.preset));
+            });
+
+            document.getElementById('btn-reset').addEventListener('click', resetFilters);
+            document.getElementById('btn-copy').addEventListener('click', copyToClipboard);
+        });
+
+        // --- 4. CARGA DE DATOS ---
+        function loadCSV() {
+            fetch(CONFIG.csvFileName)
+                .then(r => {
+                    if(!r.ok) throw new Error("No se encuentra el CSV");
+                    return r.arrayBuffer();
+                })
+                .then(buffer => {
+                    const decoder = new TextDecoder(CONFIG.encoding);
+                    const csvText = decoder.decode(buffer);
+                    Papa.parse(csvText, {
+                        header: true,
+                        delimiter: ";",
+                        skipEmptyLines: true,
+                        complete: function(results) {
+                            STATE.data = results.data.map(row => {
+                                const processed = { ...row };
+                                const dateStr = row[FIELD_MAP.fecha.key];
+                                processed._dateObj = null;
+                                processed._year = null;
+                                processed._month = null;
+
+                                if (dateStr) {
+                                    const parts = dateStr.split('/');
+                                    if (parts.length === 3) {
+                                        let d = parseInt(parts[0], 10);
+                                        let m = parseInt(parts[1], 10) - 1; 
+                                        let y = parseInt(parts[2], 10);
+                                        if(y < 100) y += 2000;
+                                        const dateObj = new Date(y, m, d);
+                                        if(!isNaN(dateObj.getTime())) {
+                                            processed._dateObj = dateObj;
+                                            processed._year = y;
+                                            processed._month = m;
+                                        }
+                                    }
+                                }
+                                return processed;
+                            });
+
+                            STATE.filtered = [...STATE.data];
+                            populateSelects();
+                            applyFilters();
+                            document.getElementById('loading-overlay').style.display = 'none';
+                        },
+                        error: function(err) {
+                            alert("Error leyendo CSV: " + err.message);
+                        }
+                    });
+                })
+                .catch(err => {
+                    alert("Error crítico: " + err.message + "\nAsegúrate de que 'BD-21-11-2025.csv' está en la carpeta.");
+                });
+        }
+
+        // --- 5. GESTIÓN DE COLUMNAS ---
+        function initColumnSelector() {
+            const container = document.getElementById('column-selector');
+            container.innerHTML = '';
+            
+            Object.keys(FIELD_MAP).forEach(fieldId => {
+                const conf = FIELD_MAP[fieldId];
+                if(conf.default) STATE.visibleColumns.push(fieldId);
+                
+                const label = document.createElement('label');
+                label.className = 'col-toggle';
+                label.innerHTML = `
+                    <input type="checkbox" value="${fieldId}" ${conf.default ? 'checked' : ''}>
+                    ${conf.label}
+                `;
+                
+                label.querySelector('input').addEventListener('change', (e) => {
+                    if(STATE.activePreset) return;
+                    if(e.target.checked) {
+                        STATE.visibleColumns.push(fieldId);
+                    } else {
+                        STATE.visibleColumns = STATE.visibleColumns.filter(id => id !== fieldId);
+                    }
+                    const order = Object.keys(FIELD_MAP);
+                    STATE.visibleColumns.sort((a,b) => order.indexOf(a) - order.indexOf(b));
+                    renderTable();
+                });
+                container.appendChild(label);
+            });
+        }
+
+        function populateSelects() {
+            const fill = (selectId, csvKey) => {
+                const set = new Set();
+                STATE.data.forEach(r => {
+                    const val = r[csvKey];
+                    if(val && String(val).trim() !== '') set.add(String(val).trim());
+                });
+                const sorted = Array.from(set).sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }));
+                const sel = document.getElementById(selectId);
+                const currentVal = sel.value;
+                sel.innerHTML = '<option value="">Todos</option>';
+                sorted.forEach(v => sel.innerHTML += `<option value="${v}">${v}</option>`);
+                sel.value = currentVal;
+            };
+
+            const yearSet = new Set();
+            STATE.data.forEach(r => { if(r._year) yearSet.add(r._year); });
+            const sortedYears = Array.from(yearSet).sort((a,b) => b - a);
+            const yearSel = document.getElementById('f-year');
+            yearSel.innerHTML = '<option value="">Todos</option>';
+            sortedYears.forEach(y => yearSel.innerHTML += `<option value="${y}">${y}</option>`);
+
+            fill('f-coleccion', FIELD_MAP.coleccion.key);
+            fill('f-serie', FIELD_MAP.serie.key);
+            fill('f-tipologia', FIELD_MAP.tipologia.key);
+            fill('f-medida', FIELD_MAP.medida.key);
+            fill('f-espesor', FIELD_MAP.espesor.key);
+            fill('f-acabado', FIELD_MAP.acabado.key);
+            fill('f-efecto', FIELD_MAP.efecto.key);
+            fill('f-color', FIELD_MAP.color.key);
+            fill('f-precio', FIELD_MAP.grupo.key);
+            fill('f-clase', FIELD_MAP.clase.key);
+            fill('f-r', FIELD_MAP.r.key);
+            fill('f-letra', FIELD_MAP.din.key);
+            fill('f-ptv', FIELD_MAP.ptv.key);
+        }
+
+        // --- 6. LÓGICA DE FILTRADO Y APLICACIÓN DE PRESETS ---
+        function activatePreset(presetKey) {
+            document.querySelectorAll('.form-control').forEach(el => el.value = "");
+            resetSmartDateButtons();
+            STATE.dateFilter.mode = 'manual';
+            STATE.dateFilter.minDate = null;
+            
+            STATE.activePreset = presetKey;
+            
+            document.querySelectorAll('.btn-preset').forEach(b => b.classList.remove('active-preset'));
+            document.querySelector(`button[data-preset="${presetKey}"]`).classList.add('active-preset');
+            
+            const banner = document.getElementById('active-preset-banner');
+            banner.style.display = 'flex';
+            document.getElementById('preset-name').innerText = PRESETS[presetKey].name;
+            document.getElementById('col-selector-title').innerText = "Columnas Predeterminadas (Fijas)";
+            
+            document.querySelectorAll('.col-toggle input').forEach(el => el.disabled = true);
+            
+            applyFilters();
+        }
+
+        function setSmartDateFilter(monthsBack, btnId, isCurrentYear = false) {
+            if(STATE.activePreset) resetFilters();
+            
+            document.getElementById('f-year').value = "";
+            document.getElementById('f-month').value = "";
+            resetSmartDateButtons();
+            document.getElementById(btnId).classList.add('active');
+
+            const now = new Date();
+            if (isCurrentYear) {
+                const startOfYear = new Date(now.getFullYear(), 0, 1);
+                STATE.dateFilter.minDate = startOfYear;
+            } else {
+                const targetDate = new Date();
+                targetDate.setMonth(targetDate.getMonth() - monthsBack);
+                STATE.dateFilter.minDate = targetDate;
+            }
+            STATE.dateFilter.mode = 'smart';
+            applyFilters();
+        }
+
+        function resetSmartDateButtons() {
+            document.querySelectorAll('.btn-pill').forEach(b => b.classList.remove('active'));
+        }
+
+        function applyFilters() {
+            let resultData = [];
+
+            if (STATE.activePreset) {
+                const preset = PRESETS[STATE.activePreset];
+                // 1. Filtrar
+                let data = preset.process(STATE.data);
+                
+                // 2. Deduplicar (Lógica Custom o Boolean)
+                if (preset.deduplicate) {
+                    const uniqueMap = new Map();
+                    data.forEach(item => {
+                        let key;
+                        if (typeof preset.deduplicate === 'function') {
+                            key = preset.deduplicate(item);
+                        } else {
+                            key = item[FIELD_MAP.nombre.key]; // Fallback
+                        }
+                        
+                        if (key && !uniqueMap.has(key)) {
+                            uniqueMap.set(key, item);
+                        }
+                    });
+                    data = Array.from(uniqueMap.values());
+                }
+
+                // 3. Ordenar
+                if (preset.sort) {
+                    data.sort(preset.sort);
+                }
+
+                resultData = data;
+                
+            } else {
+                // Filtros Manuales
+                const sText = document.getElementById('f-search').value.toLowerCase();
+                const sYear = document.getElementById('f-year').value;
+                const sMonth = document.getElementById('f-month').value;
+                
+                const filters = {
+                    coleccion: document.getElementById('f-coleccion').value,
+                    serie: document.getElementById('f-serie').value,
+                    tipologia: document.getElementById('f-tipologia').value,
+                    medida: document.getElementById('f-medida').value,
+                    espesor: document.getElementById('f-espesor').value,
+                    acabado: document.getElementById('f-acabado').value,
+                    efecto: document.getElementById('f-efecto').value,
+                    color: document.getElementById('f-color').value,
+                    grupo: document.getElementById('f-precio').value,
+                    clase: document.getElementById('f-clase').value,
+                    r: document.getElementById('f-r').value,
+                    din: document.getElementById('f-letra').value,
+                    ptv: document.getElementById('f-ptv').value
+                };
+
+                resultData = STATE.data.filter(row => {
+                    if (STATE.dateFilter.mode === 'smart' && STATE.dateFilter.minDate) {
+                        if (!row._dateObj || row._dateObj < STATE.dateFilter.minDate) return false;
+                    } else {
+                        if (sYear && (!row._year || row._year !== parseInt(sYear))) return false;
+                        if (sMonth && (row._month === null || row._month !== parseInt(sMonth))) return false;
+                    }
+
+                    if (sText) {
+                        const haystack = (
+                            (row[FIELD_MAP.nombre.key]||'') + ' ' + 
+                            (row[FIELD_MAP.serie.key]||'') + ' ' + 
+                            (row[FIELD_MAP.id.key]||'')
+                        ).toLowerCase();
+                        if (!haystack.includes(sText)) return false;
+                    }
+
+                    for (const [key, val] of Object.entries(filters)) {
+                        if (val && row[FIELD_MAP[key].key] !== val) return false;
+                    }
+                    return true;
+                });
+
+                if (STATE.dateFilter.mode === 'smart' || sYear) {
+                    resultData.sort((a,b) => (b._dateObj || 0) - (a._dateObj || 0));
+                }
+            }
+
+            STATE.filtered = resultData;
+            document.getElementById('total-count').innerText = `${STATE.filtered.length} filas`;
+            renderTable();
+        }
+
+        function resetFilters() {
+            document.querySelectorAll('.form-control').forEach(el => el.value = "");
+            resetSmartDateButtons();
+            
+            STATE.dateFilter.mode = 'manual';
+            STATE.dateFilter.minDate = null;
+            STATE.activePreset = null;
+            
+            document.querySelectorAll('.btn-preset').forEach(b => b.classList.remove('active-preset'));
+            document.getElementById('active-preset-banner').style.display = 'none';
+            document.getElementById('col-selector-title').innerText = "Columnas Visibles";
+            document.querySelectorAll('.col-toggle input').forEach(el => el.disabled = false);
+
+            applyFilters();
+        }
+
+        // --- 7. RENDERIZADO DE TABLA ---
+        function renderTable() {
+            const thead = document.getElementById('table-header');
+            const tbody = document.getElementById('table-body');
+            
+            thead.innerHTML = '';
+            tbody.innerHTML = '';
+
+            if (STATE.filtered.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="100" class="p-8 text-center text-gray-400">No hay resultados</td></tr>';
+                return;
+            }
+
+            let columnsToRender = [];
+            
+            if (STATE.activePreset) {
+                columnsToRender = PRESETS[STATE.activePreset].columns;
+            } else {
+                columnsToRender = STATE.visibleColumns.map(id => ({
+                    type: 'field',
+                    id: id,
+                    header: FIELD_MAP[id].label
+                }));
+            }
+
+            // Headers
+            columnsToRender.forEach(col => {
+                const th = document.createElement('th');
+                th.innerText = col.type === 'field' ? FIELD_MAP[col.id].label : (col.header || '');
+                thead.appendChild(th);
+            });
+
+            // Filas
+            const VIEW_LIMIT = 500;
+            const dataToShow = STATE.filtered.slice(0, VIEW_LIMIT);
+
+            const fragment = document.createDocumentFragment();
+            dataToShow.forEach(row => {
+                const tr = document.createElement('tr');
+                columnsToRender.forEach(col => {
+                    const td = document.createElement('td');
+                    if (col.type === 'field') {
+                        td.innerText = row[FIELD_MAP[col.id].key] || '';
+                    } else if (col.type === 'virtual') {
+                        td.innerText = col.value(row);
+                        if(col.header === 'Página') td.style.background = '#fcfcfc'; 
+                    }
+                    tr.appendChild(td);
+                });
+                fragment.appendChild(tr);
+            });
+            tbody.appendChild(fragment);
+
+            if (STATE.filtered.length > VIEW_LIMIT) {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `<td colspan="100" class="text-center bg-yellow-50 text-yellow-700 font-bold py-2">
+                    ⚠️ Mostrando primeras ${VIEW_LIMIT} filas de ${STATE.filtered.length}. Al copiar a Excel se copiarán TODAS.
+                </td>`;
+                tbody.appendChild(tr);
+            }
+        }
+
+        // --- 8. EXPORTACIÓN ---
+        function copyToClipboard() {
+            if (STATE.filtered.length === 0) {
+                alert("No hay datos para copiar.");
+                return;
+            }
+
+            const tempTable = document.createElement('table');
+            
+            let columnsToRender = [];
+            if (STATE.activePreset) {
+                columnsToRender = PRESETS[STATE.activePreset].columns;
+            } else {
+                columnsToRender = STATE.visibleColumns.map(id => ({ type: 'field', id: id, header: FIELD_MAP[id].label }));
+            }
+
+            // Header
+            const thead = document.createElement('thead');
+            const trHead = document.createElement('tr');
+            columnsToRender.forEach(col => {
+                const th = document.createElement('th');
+                th.innerText = col.type === 'field' ? FIELD_MAP[col.id].label : (col.header || '');
+                th.style.border = "1px solid #000"; 
+                th.style.background = "#EEE";
+                th.style.fontWeight = "bold";
+                trHead.appendChild(th);
+            });
+            thead.appendChild(trHead);
+            tempTable.appendChild(thead);
+
+            // Body
+            const tbody = document.createElement('tbody');
+            STATE.filtered.forEach(row => {
+                const tr = document.createElement('tr');
+                columnsToRender.forEach(col => {
+                    const td = document.createElement('td');
+                    if (col.type === 'field') {
+                        td.innerText = row[FIELD_MAP[col.id].key] || '';
+                    } else {
+                        td.innerText = col.value(row);
+                    }
+                    td.style.border = "1px solid #CCC";
+                    tr.appendChild(td);
+                });
+                tbody.appendChild(tr);
+            });
+            tempTable.appendChild(tbody);
+
+            tempTable.style.borderCollapse = 'collapse';
+            document.body.appendChild(tempTable);
+            
+            const range = document.createRange();
+            range.selectNode(tempTable);
+            window.getSelection().removeAllRanges();
+            window.getSelection().addRange(range);
+
+            try {
+                document.execCommand('copy');
+                alert(`✅ ${STATE.filtered.length} filas copiadas al portapapeles.\n\nAhora abre Excel y pega (Ctrl+V).`);
+            } catch (err) {
+                alert("Error al intentar copiar. Tu navegador no lo permite.");
+            }
+
+            window.getSelection().removeAllRanges();
+            document.body.removeChild(tempTable);
+        }
+
+        function debounce(func, wait) {
+            let timeout;
+            return function(...args) {
+                const context = this;
+                clearTimeout(timeout);
+                timeout = setTimeout(() => func.apply(context, args), wait);
+            };
+        }
+
+        // 1. Añadir el listener en el DOMContentLoaded (busca esta parte en tu código y añade la línea del btn-download-all)
+document.addEventListener('DOMContentLoaded', () => {
+    // ... tus otros listeners ...
+    document.getElementById('btn-download-all').addEventListener('click', generateFullExcel);
+});
+
+// 2. Nueva Función para Generar el Excel Multicapa
+function generateFullExcel() {
+    if (STATE.data.length === 0) {
+        alert("Espera a que se carguen los datos del CSV.");
+        return;
+    }
+
+    // Mostrar loading (reutilizamos tu overlay)
+    const overlay = document.getElementById('loading-overlay');
+    const overlayTitle = overlay.querySelector('h2');
+    const overlayText = overlay.querySelector('p');
+    
+    overlay.style.display = 'flex';
+    overlayTitle.innerText = "Generando Excel Completo...";
+    overlayText.innerText = "Procesando todas las pestañas. Por favor espera.";
+
+    // Usamos setTimeout para dar tiempo al navegador a renderizar el overlay antes de bloquearse procesando
+    setTimeout(() => {
+        try {
+            // Crear nuevo libro de trabajo
+            const wb = XLSX.utils.book_new();
+
+            // Recorrer todos los PRESETS definidos
+            Object.keys(PRESETS).forEach(key => {
+                const preset = PRESETS[key];
+                
+                // --- LÓGICA DE PROCESADO (Replicada de applyFilters pero sin afectar la UI) ---
+                
+                // 1. Filtrar (Process)
+                let data = preset.process([...STATE.data]); // Usamos una copia de los datos
+                
+                // 2. Deduplicar
+                if (preset.deduplicate) {
+                    const uniqueMap = new Map();
+                    data.forEach(item => {
+                        let dedupeKey;
+                        if (typeof preset.deduplicate === 'function') {
+                            dedupeKey = preset.deduplicate(item);
+                        } else {
+                            dedupeKey = item[FIELD_MAP.nombre.key]; 
+                        }
+                        if (dedupeKey && !uniqueMap.has(dedupeKey)) {
+                            uniqueMap.set(dedupeKey, item);
+                        }
+                    });
+                    data = Array.from(uniqueMap.values());
+                }
+
+                // 3. Ordenar
+                if (preset.sort) {
+                    data.sort(preset.sort);
+                }
+
+                // --- PREPARAR DATOS PARA SHEETJS ---
+                
+                // Crear Cabeceras
+                const headers = preset.columns.map(col => {
+                    return col.type === 'field' ? FIELD_MAP[col.id].label : col.header;
+                });
+
+                // Crear Filas (Mapear datos a columnas)
+                const rows = data.map(row => {
+                    return preset.columns.map(col => {
+                        if (col.type === 'field') {
+                            return row[FIELD_MAP[col.id].key] || '';
+                        } else if (col.type === 'virtual') {
+                            return col.value(row);
+                        }
+                        return '';
+                    });
+                });
+
+                // Unir cabeceras y filas
+                const wsData = [headers, ...rows];
+
+                // Crear Hoja
+                const ws = XLSX.utils.aoa_to_sheet(wsData);
+
+                // Ajustar anchos de columna (opcional, mejora estética)
+                const colWidths = headers.map(h => ({ wch: Math.max(h.length + 5, 15) }));
+                ws['!cols'] = colWidths;
+
+                // Limpiar nombre de la pestaña (Excel no permite >31 caracteres ni ciertos símbolos)
+                let sheetName = preset.name.replace(/[\\/?*\[\]:]/g, "").substring(0, 30);
+                
+                // Añadir hoja al libro
+                XLSX.utils.book_append_sheet(wb, ws, sheetName);
+            });
+
+            // Descargar archivo
+            XLSX.writeFile(wb, "Indices_Pamesa_Completo.xlsx");
+
+        } catch (err) {
+            console.error(err);
+            alert("Hubo un error generando el Excel: " + err.message);
+        } finally {
+            // Ocultar loading
+            overlay.style.display = 'none';
+            // Restaurar textos originales del loading por si acaso
+            overlayTitle.innerText = "Cargando Catálogo...";
+        }
+    }, 100);
+}
+    </script>
+</body>
+</html>
